@@ -2,7 +2,7 @@
 // Pastikan tidak ada spasi, baris kosong, atau karakter lain sebelum tag pembuka <?php
 
 // 1. Sertakan file koneksi database
-include('config/koneksi.php');
+include('../../config/koneksi.php');
 
 // 2. Cek apakah parameter ID ada di URL (GET)
 if (isset($_GET['id'])) {

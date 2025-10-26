@@ -1,73 +1,3 @@
-
-<?php
-// Pastikan path koneksi.php sudah benar (sesuaikan jika perlu)
-include('config/koneksi.php');
-
-// --- START: KODE PHP UNTUK MENGAMBIL DATA KARYAWAN ---
-
-// 1. Cek apakah ada ID yang dikirim melalui URL (saat tombol Edit diklik)
-if (!isset($_GET['id'])) {
-    // Jika tidak ada ID, alihkan kembali ke halaman data karyawan
-    header("Location: karyawan.php");
-    exit();
-}
-
-// 2. Ambil ID dari URL dan amankan (Sanitize)
-// ID yang dikirim dari halaman karyawan.php adalah 'id'
-$id_card_get = mysqli_real_escape_string($koneksi, $_GET['id']);
-
-// 3. Query untuk mengambil semua data karyawan berdasarkan ID
-$query = "SELECT * FROM karyawan WHERE id_card = '$id_card_get'";
-$result = mysqli_query($koneksi, $query);
-
-// 4. Cek apakah data ditemukan
-if (mysqli_num_rows($result) > 0) {
-    // Jika data ditemukan, simpan hasil query ke variabel $data
-    $data = mysqli_fetch_assoc($result);
-} else {
-    // Jika data tidak ditemukan (misalnya ID diubah manual di URL)
-    header("Location: karyawan.php?status=data_tidak_ditemukan");
-    exit();
-}
-
-// 5. Proses Update Data (ketika tombol 'Simpan Perubahan' diklik)
-if (isset($_POST['update'])) {
-    
-    // Ambil ID yang tersembunyi
-    $id_card_update = mysqli_real_escape_string($koneksi, $_POST['id_card_hidden']);
-    
-    // Ambil dan amankan data dari form
-    $nama          = mysqli_real_escape_string($koneksi, $_POST['nama']);
-    $jabatan       = mysqli_real_escape_string($koneksi, $_POST['jabatan']);
-    $departemen    = mysqli_real_escape_string($koneksi, $_POST['departemen']);
-    $tgl_lahir     = mysqli_real_escape_string($koneksi, $_POST['tgl_lahir']); 
-    $jenis_kelamin = mysqli_real_escape_string($koneksi, $_POST['jenis_kelamin']);
-    $telepon       = mysqli_real_escape_string($koneksi, $_POST['telepon']);
-    $tgl_masuk     = mysqli_real_escape_string($koneksi, $_POST['tgl_masuk']); 
-    $status        = mysqli_real_escape_string($koneksi, $_POST['status']);
-
-    // Query UPDATE
-    $sql = "UPDATE karyawan SET 
-                nama='$nama', 
-                jabatan='$jabatan', 
-                departemen='$departemen', 
-                tanggal_lahir='$tgl_lahir', 
-                jenis_kelamin='$jenis_kelamin', 
-                telepon='$telepon', 
-                tanggal_masuk='$tgl_masuk', 
-                status='$status' 
-            WHERE id_card='$id_card_update'";
-            
-    if (mysqli_query($koneksi, $sql)) {
-        header("Location: karyawan.php?status=edit_sukses");
-        exit();
-    } else {
-        echo "Error: " . mysqli_error($koneksi);
-    }
-}
-// --- END: KODE PHP UNTUK MENGAMBIL DATA KARYAWAN ---
-?>
-
 <!DOCTYPE html>
 <html lang="en">
 
@@ -80,20 +10,21 @@ if (isset($_POST['update'])) {
     <link rel="shortcut icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACEAAAAiCAYAAADRcLDBAAAEs2lUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4KPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iWE1QIENvcmUgNS41LjAiPgogPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4KICA8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIgogICAgeG1sbnM6ZXhpZj0iaHR0cDovL25zLmFkb2JlLmNvbS9leGlmLzEuMC8iCiAgICB4bWxuczp0aWZmPSJodHRwOi8vbnMuYWRvYmUuY29tL3RpZmYvMS4wLyIKICAgIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIKICAgIHhtbG5zOnhtcD0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wLyIKICAgIHhtbG5zOnhtcE1NPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvbW0vIgogICAgeG1sbnM6c3RFdnQ9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZUV2ZW50IyIKICAgZXhpZjpQaXhlbFhEaW1lbnNpb249IjMzIgogICBleGlmOlBpeGVsWURpbWVuc2lvbj0iMzQiCiAgIGV4aWY6Q29sb3JTcGFjZT0iMSIKICAgdGlmZjpJbWFnZVdpZHRoPSIzMyIKICAgdGlmZjpJbWFnZUxlbmd0aD0iMzQiCiAgIHRpZmY6UmVzb2x1dGlvblVuaXQ9IjIiCiAgIHRpZmY6WFJlc29sdXRpb249Ijk2LjAiCiAgIHRpZmY6WVJlc29sdXRpb249Ijk2LjAiCiAgIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiCiAgIHBob3Rvc2hvcDpJQ0NQcm9maWxlPSJzUkdCIElFQzYxOTY2LTIuMSIKICAgeG1wOk1vZGlmeURhdGU9IjIwMjItMDMtMzFUMTA6NTA6MjMrMDI6MDAiCiAgIHhtcDpNZXRhZGF0YURhdGU9IjIwMjItMDMtMzFUMTA6NTA6MjMrMDI6MDAiPgogICA8eG1wTU06SGlzdG9yeT4KICAgIDxyZGY6U2VxPgogICAgIDxyZGY6bGkKICAgICAgc3RFdnQ6YWN0aW9uPSJwcm9kdWNlZCIKICAgICAgc3RFdnQ6c29mdHdhcmVBZ2VudD0iQWZmaW5pdHkgRGVzaWduZXIgMS4xMC4xIgogICAgICBzdEV2dDp3aGVuPSIyMDIyLTAzLTMxVDEwOjUwOjIzKzAyOjAwIi8+CiAgICA8L3JkZjpTZXE+CiAgIDwveG1wTU06SGlzdG9yeT4KICA8L3JkZjpEZXNjcmlwdGlvbj4KIDwvcmRmOlJERj4KPC94OnhtcG1ldGE+Cjw/eHBhY2tldCBlbmQ9InIiPz5V57uAAAABgmlDQ1BzUkdCIElFQzYxOTY2LTIuMQAAKJF1kc8rRFEUxz9maORHo1hYKC9hISNGTWwsRn4VFmOUX5uZZ36oeTOv954kW2WrKLHxa8FfwFZZK0WkZClrYoOe87ypmWTO7dzzud97z+nec8ETzaiaWd4NWtYyIiNhZWZ2TvE946WZSjqoj6mmPjE1HKWkfdxR5sSbgFOr9Ll/rXoxYapQVik8oOqGJTwqPL5i6Q5vCzeo6dii8KlwpyEXFL519LjLLw6nXP5y2IhGBsFTJ6ykijhexGra0ITl5bRqmWU1fx/nJTWJ7PSUxBbxJkwijBBGYYwhBgnRQ7/MIQIE6ZIVJfK7f/MnyUmuKrPOKgZLpEhj0SnqslRPSEyKnpCRYdXp/9++msneoFu9JgwVT7b91ga+LfjetO3PQ9v+PgLvI1xkC/m5A+h7F32zoLXug38dzi4LWnwHzjeg8UGPGbFfySvuSSbh9QRqZ6H+Gqrm3Z7l9zm+h+iafNUV7O5Bu5z3L/wAdthn7QIme0YAAAAJcEhZcwAADsQAAA7EAZUrDhsAAAJTSURBVFiF7Zi9axRBGIefEw2IdxFBRQsLWUTBaywSK4ubdSGVIY1Y6HZql8ZKCGIqwX/AYLmCgVQKfiDn7jZeEQMWfsSAHAiKqPiB5mIgELWYOW5vzc3O7niHhT/YZvY37/swM/vOzJbIqVq9uQ04CYwCI8AhYAlYAB4Dc7HnrOSJWcoJcBS4ARzQ2F4BZ2LPmTeNuykHwEWgkQGAet9QfiMZjUSt3hwD7psGTWgs9pwH1hC1enMYeA7sKwDxBqjGnvNdZzKZjqmCAKh+U1kmEwi3IEBbIsugnY5avTkEtIAtFhBrQCX2nLVehqyRqFoCAAwBh3WGLAhbgCRIYYinwLolwLqKUwwi9pxV4KUlxKKKUwxC6ZElRCPLYAJxGfhSEOCz6m8HEXvOB2CyIMSk6m8HoXQTmMkJcA2YNTHm3congOvATo3tE3A29pxbpnFzQSiQPcB55IFmFNgFfEQeahaAGZMpsIJIAZWAHcDX2HN+2cT6r39GxmvC9aPNwH5gO1BOPFuBVWAZue0vA9+A12EgjPadnhCuH1WAE8ivYAQ4ohKaagV4gvxi5oG7YSA2vApsCOH60WngKrA3R9IsvQUuhIGY00K4flQG7gHH/mLytB4C42EgfrQb0mV7us8AAMeBS8mGNMR4nwHamtBB7B4QRNdaS0M8GxDEog7iyoAguvJ0QYSBuAOcAt71Kfl7wA8DcTvZ2KtOlJEr+ByyQtqqhTyHTIeB+ONeqi3brh+VgIN0fohUgWGggizZFTplu12yW8iy/YLOGWMpDMTPXnl+Az9vj2HERYqPAAAAAElFTkSuQmCC" type="image/png">
     
 
-  <link rel="stylesheet" crossorigin href="assets/compiled/css/table-datatable.css">
-  <link rel="stylesheet" crossorigin href="assets/compiled/css/app.css">
-  <link rel="stylesheet" crossorigin href="assets/compiled/css/app-dark.css">
+  <link rel="stylesheet" crossorigin href="../../assets/compiled/css/table-datatable.css">
+  <link rel="stylesheet" crossorigin href="../../assets/compiled/css/app.css">
+  <link rel="stylesheet" crossorigin href="../../assets/compiled/css/app-dark.css">
+
 </head>
 
 <body>
-    <script src="assets/static/js/initTheme.js"></script>
+    <script src="../../assets/static/js/initTheme.js"></script>
     <div id="app">
         <div id="sidebar">
             <div class="sidebar-wrapper active">
     <div class="sidebar-header position-relative">
         <div class="d-flex justify-content-between align-items-center">
             <div class="logo">
-                <a href="index.html"><img src="assets/images/logo.PNG" alt="Logo" srcset=""></a>
+                <a href="../../index.html"><img src="../../assets/images/logo.PNG" alt="Logo" srcset=""></a>
             </div>
             <div class="theme-toggle d-flex gap-2  align-items-center mt-2">
                 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true"
@@ -134,11 +65,14 @@ if (isset($_POST['update'])) {
             
             <li
                 class="sidebar-item active ">
-                <a href="index.html" class='sidebar-link'>
+                <a href="../../index.html" class='sidebar-link'>
                     <i class="bi bi-grid-fill"></i>
                     <span>Dashboard</span>
-                </a>   
+                </a>
+                
+
             </li>
+            
             <li
                 class="sidebar-item">
                 <a href="karyawan.php" class='sidebar-link'>
@@ -151,7 +85,7 @@ if (isset($_POST['update'])) {
                     <i class="bi bi-collection-fill"></i>
                     <span>Pelayanan Kesehatan</span>
                 </a>
-
+                
                 <ul class="submenu ">
                     
                     <li class="submenu-item  ">
@@ -170,6 +104,7 @@ if (isset($_POST['update'])) {
                     </li>
                 </ul>
                 
+
             </li>
             
             <li
@@ -194,8 +129,11 @@ if (isset($_POST['update'])) {
                     <li class="submenu-item  ">
                         <a href="layout-default.html" class="submenu-link">Transaksi Obat</a>
                         
-                    </li>       
+                    </li>
+                    
                 </ul>
+                
+
             </li>
             
             <li
@@ -203,25 +141,33 @@ if (isset($_POST['update'])) {
                 <a href="form-layout.html" class='sidebar-link'>
                     <i class="bi bi-file-earmark-medical-fill"></i>
                     <span>Laporan Klinik</span>
-                </a> 
+                </a>
+                
+
             </li>
+            
             <li
                 class="sidebar-item  has-sub">
                 <a href="#" class='sidebar-link'>
                     <i class="bi bi-person-circle"></i>
                     <span>Account</span>
                 </a>
+                
                 <ul class="submenu ">
                     
                     <li class="submenu-item  ">
                         <a href="account-profile.html" class="submenu-link">Profile</a>
+                        
                     </li>
                     
                     <li class="submenu-item  ">
                         <a href="account-security.html" class="submenu-link">Security</a>
                         
                     </li>
+                    
                 </ul>
+                
+
             </li>
             
             <li
@@ -246,10 +192,14 @@ if (isset($_POST['update'])) {
                     <li class="submenu-item  ">
                         <a href="auth-forgot-password.html" class="submenu-link">Forgot Password</a>
                         
-                    </li>  
+                    </li>
+                    
                 </ul>
-            </li>
+                
 
+            </li>
+            
+            
         </ul>
     </div>
 </div>
@@ -261,101 +211,103 @@ if (isset($_POST['update'])) {
                 </a>
             </header>
 <!-- Tempat Isi Data -->
-        <div class="page-heading">
-            <h3>Edit Data Karyawan</h3>
-        </div>
+<?php
+include('../../config/koneksi.php')
+?>
 
-        <div class="page-content">
-            <section class="section">
-                <div class="card">
-                    <div class="card-header">
-                        <h4 class="card-title">Perbarui Data Karyawan (ID: <?= $data['id_card'] ?>)</h4>
-                    </div>
-                    <div class="card-body">
-                        <form method="POST" action="" class="form">
-                            <input type="hidden" name="id_card_hidden" value="<?= $data['id_card'] ?>">
+<div class="page-heading">
+    <h3>Tambah Data Karyawan</h3>
+</div>
 
-                            <div class="row">
-                                
-                                <div class="col-md-6 col-12">
-                                    <div class="form-group">
-                                        <label for="id_card" class="form-label">ID Card</label>
-                                        <input type="text" id="id_card" class="form-control" name="id_card" value="<?= $data['id_card'] ?>" readonly>
-                                        <small class="text-muted">ID Card tidak dapat diubah.</small>
-                                    </div>
-                                </div>
-                                <div class="col-md-6 col-12">
-                                    <div class="form-group">
-                                        <label for="nama" class="form-label">Nama Lengkap <span class="text-danger">*</span></label>
-                                        <input type="text" id="nama" class="form-control" name="nama" value="<?= $data['nama'] ?>" required>
-                                    </div>
-                                </div>
-
-                                <div class="col-md-6 col-12">
-                                    <div class="form-group">
-                                        <label for="jabatan" class="form-label">Jabatan <span class="text-danger">*</span></label>
-                                        <input type="text" id="jabatan" class="form-control" name="jabatan" value="<?= $data['jabatan'] ?>" required>
-                                    </div>
-                                </div>
-                                <div class="col-md-6 col-12">
-                                    <div class="form-group">
-                                        <label for="departemen" class="form-label">Departemen <span class="text-danger">*</span></label>
-                                        <input type="text" id="departemen" class="form-control" name="departemen" value="<?= $data['departemen'] ?>" required>
-                                    </div>
-                                </div>
-
-                                <div class="col-md-6 col-12">
-                                    <div class="form-group">
-                                        <label for="tgl_lahir" class="form-label">Tanggal Lahir</label>
-                                        <input type="date" id="tgl_lahir" class="form-control" name="tgl_lahir" value="<?= $data['tanggal_lahir'] ?>">
-                                    </div>
-                                </div>
-                                <div class="col-md-6 col-12">
-                                    <div class="form-group">
-                                        <label for="jenis_kelamin" class="form-label">Jenis Kelamin <span class="text-danger">*</span></label>
-                                        <select id="jenis_kelamin" class="form-select" name="jenis_kelamin" required>
-                                            <option value="MAN" <?= $data['jenis_kelamin'] == 'MAN' ? 'selected' : '' ?>>Laki-laki (L)</option>
-                                            <option value="FEMALE" <?= $data['jenis_kelamin'] == 'FEMALE' ? 'selected' : '' ?>>Perempuan (P)</option>
-                                        </select>
-                                    </div>
-                                </div>  
-                                
-                                <div class="col-md-6 col-12">
-                                    <div class="form-group">
-                                        <label for="telepon" class="form-label">Telepon</label>
-                                        <input type="text" id="telepon" class="form-control" name="telepon" value="<?= $data['telepon'] ?>">
-                                    </div>
-                                </div>
-                                <div class="col-md-6 col-12">
-                                    <div class="form-group">
-                                        <label for="tgl_masuk" class="form-label">Tanggal Masuk <span class="text-danger">*</span></label>
-                                        <input type="date" id="tgl_masuk" class="form-control" name="tgl_masuk" value="<?= $data['tanggal_masuk'] ?>" required>
-                                    </div>
-                                </div>
-
-                                <div class="col-12">
-                                    <div class="form-group">
-                                        <label for="status" class="form-label">Status <span class="text-danger">*</span></label>
-                                        <select id="status" class="form-select" name="status" required>
-                                            <option value="Aktif" <?= $data['status'] == 'Aktif' ? 'selected' : '' ?>>Aktif</option>
-                                            <option value="Nonaktif" <?= $data['status'] == 'Nonaktif' ? 'selected' : '' ?>>Nonaktif</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div class="col-12 d-flex justify-content-end mt-3">
-                                    <button type="submit" class="btn btn-success me-1 mb-1" name="update">
-                                        <i class="bi bi-arrow-repeat me-2"></i>Simpan Perubahan
-                                    </button>
-                                    <a href="karyawan.php" class="btn btn-light-secondary me-1 mb-1">Batal</a>
-                                </div>
+<div class="page-content">
+    <section class="section">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title">Formulir Pendaftaran Karyawan Baru</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="simpan_karyawan.php" class="form">
+                    <div class="row">
+                        
+                        <div class="col-md-6 col-12">
+                            <div class="form-group">
+                                <label for="id_card" class="form-label">ID Card <span class="text-danger">*</span></label>
+                                <input type="text" id="id_card" class="form-control" name="id_card" required placeholder="Contoh: FA00001">
                             </div>
-                        </form>
                         </div>
+                        <div class="col-md-6 col-12">
+                            <div class="form-group">
+                                <label for="nama" class="form-label">Nama Lengkap <span class="text-danger">*</span></label>
+                                <input type="text" id="nama" class="form-control" name="nama" required placeholder="Masukkan nama lengkap karyawan">
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-12">
+                            <div class="form-group">
+                                <label for="jabatan" class="form-label">Jabatan <span class="text-danger">*</span></label>
+                                <input type="text" id="jabatan" class="form-control" name="jabatan" required placeholder="Contoh: Operator / Ass. Manager">
+                            </div>
+                        </div>
+                        <div class="col-md-6 col-12">
+                            <div class="form-group">
+                                <label for="departemen" class="form-label">Departemen <span class="text-danger">*</span></label>
+                                <input type="text" id="departemen" class="form-control" name="departemen" required placeholder="Contoh: Maintenance / HRD">
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-12">
+                            <div class="form-group">
+                                <label for="tgl_lahir" class="form-label">Tanggal Lahir</label>
+                                <input type="date" id="tgl_lahir" class="form-control" name="tgl_lahir">
+                            </div>
+                        </div>
+                        <div class="col-md-6 col-12">
+                            <div class="form-group">
+                                <label for="jenis_kelamin" class="form-label">Jenis Kelamin <span class="text-danger">*</span></label>
+                                <select id="jenis_kelamin" class="form-select" name="jenis_kelamin" required>
+                                    <option value="">Pilih Jenis Kelamin</option>
+                                    <option value="MAN">Laki-laki (L)</option>
+                                    <option value="FEMALE">Perempuan (P)</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6 col-12">
+                            <div class="form-group">
+                                <label for="telepon" class="form-label">Telepon</label>
+                                <input type="tel" id="telepon" class="form-control" name="telepon" placeholder="Contoh: 0812xxxxxxxx">
+                            </div>
+                        </div>
+                        <div class="col-md-6 col-12">
+                            <div class="form-group">
+                                <label for="tgl_masuk" class="form-label">Tanggal Masuk <span class="text-danger">*</span></label>
+                                <input type="date" id="tgl_masuk" class="form-control" name="tgl_masuk" required>
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="form-group">
+                                <label for="status" class="form-label">Status <span class="text-danger">*</span></label>
+                                <select id="status" class="form-select" name="status" required>
+                                    <option value="Aktif">Aktif</option>
+                                    <option value="Nonaktif">Nonaktif</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="col-12 d-flex justify-content-end mt-3">
+                            <button type="submit" class="btn btn-primary me-1 mb-1" name="simpan">
+                                <i class="bi bi-save me-2"></i>Simpan Data
+                            </button>
+                            <a href="karyawan.php" class="btn btn-light-secondary me-1 mb-1">Batal/Kembali</a>
+                        </div>
+                    </div>
+                </form>
                 </div>
-            </section>
         </div>
-        </div>
+    </section>
+</div>
+
 <!-- Tempat Isi Data -->
             <footer>
     <div class="footer clearfix mb-0 text-muted">
@@ -370,16 +322,16 @@ if (isset($_POST['update'])) {
 </footer>
         </div>
     </div>
-    <script src="assets/static/js/components/dark.js"></script>
-    <script src="assets/extensions/perfect-scrollbar/perfect-scrollbar.min.js"></script>
+    <script src="../../assets/static/js/components/dark.js"></script>
+    <script src="../../assets/extensions/perfect-scrollbar/perfect-scrollbar.min.js"></script>
     
     
-    <script src="assets/compiled/js/app.js"></script>
+    <script src="../../assets/compiled/js/app.js"></script>
     
 
     
 <!-- Need: Apexcharts -->
-<script src="assets/extensions/apexcharts/apexcharts.min.js"></script>
-<script src="assets/static/js/pages/dashboard.js"></script>
-<script src="assets/compiled/js/app.js"></script>
+<script src="../../assets/extensions/apexcharts/apexcharts.min.js"></script>
+<script src="../../assets/static/js/pages/dashboard.js"></script>
+<script src="../../assets/compiled/js/app.js"></script>
 </body>
