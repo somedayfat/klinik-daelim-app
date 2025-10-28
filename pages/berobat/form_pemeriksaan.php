@@ -1,4 +1,4 @@
-<?php
+y<?php
 // File: form_pemeriksaan.php
 session_start();
 include('../../config/koneksi.php'); 
@@ -8,6 +8,7 @@ date_default_timezone_set('Asia/Jakarta');
 $error = '';
 $data_karyawan = null;
 $id_card_cari = '';
+$petugas = "Mantri Adit"; // Ganti dengan data session user yang login
 
 // Helper untuk mengisi ulang form setelah POST gagal
 function postValue($key, $default = '') {
@@ -16,6 +17,7 @@ function postValue($key, $default = '') {
 
 // --- LOGIKA UTAMA: PENYIMPANAN TRANSAKSIONAL ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['simpan_pemeriksaan'])) {
+    
     // 1. Ambil dan Bersihkan Data Pemeriksaan
     $id_card = mysqli_real_escape_string($koneksi, $_POST['id_card']);
     
@@ -31,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['simpan_pemeriksaan']))
         $tindakan = mysqli_real_escape_string($koneksi, $_POST['tindakan']);
         $rujukan = mysqli_real_escape_string($koneksi, $_POST['rujukan']);
         $catatan = mysqli_real_escape_string($koneksi, $_POST['catatan']);
-        $petugas = "Dr. Admin"; // Ganti dengan data session user yang login
+        // $petugas sudah didefinisikan di awal
 
         // Data Resep Obat
         $obat_ids = $_POST['obat_id'] ?? [];
@@ -66,15 +68,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['simpan_pemeriksaan']))
                     $aturan_pakai = mysqli_real_escape_string($koneksi, $aturan_pakais[$index]);
                     
                     if ($obat_id && $jumlah > 0) {
-                        // 1. Cek Stok Saat Ini
+                        
+                        // 1. Cek Stok Saat Ini (Untuk $stok_sebelum)
                         $q_check_stok = "SELECT stok_tersedia, nama_obat FROM obat WHERE id = '$obat_id'";
                         $r_check_stok = mysqli_query($koneksi, $q_check_stok);
                         $data_obat = mysqli_fetch_assoc($r_check_stok);
+                        
+                        if (!$data_obat) {
+                            throw new Exception("Obat dengan ID $obat_id tidak ditemukan.");
+                        }
+
                         $stok_saat_ini = $data_obat['stok_tersedia'];
                         
                         if ($stok_saat_ini < $jumlah) {
                             throw new Exception("Stok obat **" . $data_obat['nama_obat'] . "** tidak cukup! Tersedia: " . $stok_saat_ini . ", Diminta: " . $jumlah);
                         }
+                        
+                        $stok_sesudah = $stok_saat_ini - $jumlah;
 
                         // 2. INSERT KE TABEL RESEP_OBAT
                         $query_resep = "INSERT INTO resep_obat (
@@ -86,12 +96,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['simpan_pemeriksaan']))
                         if (!mysqli_query($koneksi, $query_resep)) {
                             throw new Exception("Gagal menyimpan resep obat: " . mysqli_error($koneksi));
                         }
+                        $resep_id = mysqli_insert_id($koneksi); // *** Dapatkan ID Resep ***
 
                         // 3. UPDATE (PENGURANGAN) STOK OBAT
-                        $query_update_stok = "UPDATE obat SET stok_tersedia = stok_tersedia - $jumlah, updated_at = NOW() WHERE id = '$obat_id'";
+                        $query_update_stok = "UPDATE obat SET stok_tersedia = '$stok_sesudah', updated_at = NOW() WHERE id = '$obat_id'";
                         
                         if (!mysqli_query($koneksi, $query_update_stok)) {
                             throw new Exception("Gagal mengurangi stok obat: " . mysqli_error($koneksi));
+                        }
+
+                        // 4. INSERT KE TABEL TRANSAKSI_OBAT (PENCATATAN KELUAR)
+                        $petugas_transaksi = mysqli_real_escape_string($koneksi, $petugas);
+                        $keterangan_keluar = "Pengeluaran resep (Berobat ID: $berobat_id) untuk pasien: " . $id_card; 
+                        
+                        $query_transaksi = "INSERT INTO transaksi_obat (
+                            obat_id, jenis_transaksi, jumlah, stok_sebelum, stok_sesudah, 
+                            resep_obat_id, tanggal_transaksi, keterangan, petugas
+                        ) VALUES (
+                            '$obat_id', 'KELUAR', '$jumlah', '$stok_saat_ini', '$stok_sesudah', 
+                            '$resep_id', NOW(), '$keterangan_keluar', '$petugas_transaksi'
+                        )";
+                        
+                        if (!mysqli_query($koneksi, $query_transaksi)) {
+                            throw new Exception("Gagal menyimpan transaksi obat keluar: " . mysqli_error($koneksi));
                         }
                     }
                 }
@@ -189,14 +216,16 @@ if (isset($_POST['id_card']) || isset($_GET['id_card_selected'])) {
                                 </div>
                             </div>
                             
-                            <div class="row" id="form_pemeriksaan_detail" style="<?= $data_karyawan ? '' : 'pointer-events: none; opacity: 0.6;'; ?>">
+                            <?php $is_disabled_style = $data_karyawan ? '' : 'pointer-events: none; opacity: 0.6;'; ?>
+                            <div class="row" id="form_pemeriksaan_detail" style="<?= $is_disabled_style; ?>">
+                                
                                 <div class="col-md-6">
                                     <h5 class="text-primary"><i class="bi bi-heart-pulse-fill me-1"></i> Tanda Vital & Keluhan</h5>
                                     
                                     <div class="alert alert-info small p-2">
-                                        <strong>Golongan Darah</strong> : <?= htmlspecialchars($data_karyawan['golongan_darah'] ?? 'BELUM ADA DATA'); ?><br>
-                                        <strong>Riwayat Penyakit</strong> : <?= htmlspecialchars($data_karyawan['penyakit_terdahulu'] ?? 'BELUM ADA DATA'); ?><br>
-                                        <strong>Alergi</strong> : <?= htmlspecialchars($data_karyawan['alergi'] ?? 'BELUM ADA DATA'); ?>
+                                        **Gol. Darah:** <?= htmlspecialchars($data_karyawan['golongan_darah'] ?? 'BELUM ADA DATA'); ?><br>
+                                        **Penyakit Terdahulu:** <?= htmlspecialchars($data_karyawan['penyakit_terdahulu'] ?? 'BELUM ADA DATA'); ?><br>
+                                        **Alergi:** **<?= htmlspecialchars($data_karyawan['alergi'] ?? 'BELUM ADA DATA'); ?>**
                                     </div>
                                     
                                     <div class="row">
@@ -233,10 +262,12 @@ if (isset($_POST['id_card']) || isset($_GET['id_card_selected'])) {
                                         <div id="resep_container">
                                             <?php 
                                             if ($error && isset($_POST['obat_id'])): 
+                                                // Counter di-set ulang untuk JS
+                                                $index_counter = 0; 
                                                 foreach ($_POST['obat_id'] as $index => $obat_id_post):
                                                     $nama_obat_fallback = 'Obat ID: ' . htmlspecialchars($obat_id_post);
                                             ?>
-                                                <div class="row resep-row border-bottom pb-2 mb-2" id="row-<?= $index ?>">
+                                                <div class="row resep-row border-bottom pb-2 mb-2" id="row-<?= $index_counter ?>">
                                                     <div class="col-md-12 mb-2">
                                                         <label class="form-label small fw-bold">Obat</label>
                                                         <select class="form-control obat-select" name="obat_id[]" required>
@@ -269,6 +300,7 @@ if (isset($_POST['id_card']) || isset($_GET['id_card_selected'])) {
                                                     </div>
                                                 </div>
                                             <?php 
+                                                    $index_counter++;
                                                 endforeach;
                                             endif; 
                                             ?>
@@ -315,6 +347,7 @@ if (isset($_POST['id_card']) || isset($_GET['id_card_selected'])) {
 
     <script>
     $(document).ready(function() {
+        // Jika terjadi error POST, kita harus menghitung ulang index terakhir
         let row_counter = <?= $error && isset($_POST['obat_id']) ? count($_POST['obat_id']) : 0; ?>;
 
         // =============================================
@@ -385,7 +418,8 @@ if (isset($_POST['id_card']) || isset($_GET['id_card_selected'])) {
             selectElement.select2({
                 placeholder: 'Cari Nama/Kode Obat...',
                 allowClear: true,
-                dropdownParent: selectElement.parent(), 
+                // Penting: dropdownParent mencegah masalah z-index di modal/form tertentu
+                dropdownParent: selectElement.parent().parent(), 
                 ajax: {
                     url: 'api_obat.php', 
                     dataType: 'json',
@@ -401,6 +435,7 @@ if (isset($_POST['id_card']) || isset($_GET['id_card_selected'])) {
                 minimumInputLength: 2,
                 templateSelection: function (data) {
                     if (!data.id) return data.text;
+                    // Hilangkan Stok: dari tampilan setelah dipilih
                     return data.text.split(' - Stok:')[0]; 
                 }
             });
@@ -411,7 +446,7 @@ if (isset($_POST['id_card']) || isset($_GET['id_card_selected'])) {
                  selectElement.append(newOption).trigger('change');
             }
 
-            // Event handler saat obat dipilih
+            // Event handler saat obat dipilih: Update info stok
             selectElement.on('select2:select', function (e) {
                 const data = e.params.data;
                 const row = $(this).closest('.resep-row');
@@ -419,6 +454,7 @@ if (isset($_POST['id_card']) || isset($_GET['id_card_selected'])) {
                 row.find('.jumlah-input').attr('max', data.stok).attr('placeholder', 'Max: ' + data.stok);
                 row.find('.satuan-display').text(data.satuan);
                 
+                // Peringatan stok rendah
                 if (data.stok <= 10) {
                      row.find('.stok-warning').html('<span class="text-danger small ms-2">Stok Rendah (' + data.stok + ' ' + data.satuan + ')</span>');
                 } else {
@@ -426,6 +462,7 @@ if (isset($_POST['id_card']) || isset($_GET['id_card_selected'])) {
                 }
             });
         }
+        
 
         // FUNGSI TAMBAH BARIS RESEP
         function addResepRow() {
@@ -490,12 +527,13 @@ if (isset($_POST['id_card']) || isset($_GET['id_card_selected'])) {
                         if (data) {
                             const initialData = {
                                 id: data.id,
-                                text: data.text, // Menggunakan text dari API
+                                text: data.text,
                                 stok: data.stok,
                                 satuan: data.satuan
                             };
                             // Re-init Select2 dengan data yang sudah dipilih
-                            initSelect2Obat($(`#row-`+index+` .obat-select`), initialData);
+                            // Menggunakan index array PHP karena index counter JS baru dimulai dari akhir loop.
+                            initSelect2Obat($(`#row-`+index+` .obat-select`), initialData); 
                             $(`#row-`+index+` .jumlah-input`).attr('max', data.stok).attr('placeholder', 'Max: ' + data.stok);
                             $(`#row-`+index+` .satuan-display`).text(data.satuan);
                         }

@@ -1,18 +1,17 @@
 <?php
 // File: master_obat.php
 session_start();
+// Pastikan path koneksi sudah benar!
 include('../../config/koneksi.php'); 
 
 date_default_timezone_set('Asia/Jakarta');
 
-// --- Logika Tambah/Edit/Hapus (CRUD) ---
-// (Logika CRUD PHP tetap sama seperti sebelumnya)
 $pesan_status = '';
 $tipe_alert = '';
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 $id_edit = isset($_GET['id']) ? mysqli_real_escape_string($koneksi, $_GET['id']) : 0;
 
-// Logika Hapus
+// --- Logika Hapus (DELETE) ---
 if ($action == 'delete' && $id_edit > 0) {
     $q_delete = "DELETE FROM obat WHERE id='$id_edit'";
     if (mysqli_query($koneksi, $q_delete)) {
@@ -24,47 +23,120 @@ if ($action == 'delete' && $id_edit > 0) {
     }
 }
 
-// Logika POST (Tambah dan Edit)
+// --- Logika POST (Tambah, Edit, dan TAMBAH STOK BARU) ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $id_post = mysqli_real_escape_string($koneksi, $_POST['id_obat']);
-    $kode = mysqli_real_escape_string($koneksi, $_POST['kode_obat']);
-    $nama = mysqli_real_escape_string($koneksi, $_POST['nama_obat']);
-    $kategori = mysqli_real_escape_string($koneksi, $_POST['kategori']);
-    $satuan = mysqli_real_escape_string($koneksi, $_POST['satuan']);
-    $stok_min = mysqli_real_escape_string($koneksi, $_POST['stok_minimum']);
-    $stok_tersedia = mysqli_real_escape_string($koneksi, $_POST['stok_tersedia']);
-    $harga = mysqli_real_escape_string($koneksi, $_POST['harga_satuan']);
-    $kadaluarsa = mysqli_real_escape_string($koneksi, $_POST['tanggal_kadaluarsa']);
+    
+    // =========================================================
+    // A. LOGIKA TAMBAH/EDIT DATA MASTER OBAT (CRUD)
+    // =========================================================
+    if (!isset($_POST['action']) || $_POST['action'] != 'tambah_stok') { 
+        $id_post = mysqli_real_escape_string($koneksi, $_POST['id_obat']);
+        $kode = mysqli_real_escape_string($koneksi, $_POST['kode_obat']);
+        $nama = mysqli_real_escape_string($koneksi, $_POST['nama_obat']);
+        $kategori = mysqli_real_escape_string($koneksi, $_POST['kategori']);
+        $satuan = mysqli_real_escape_string($koneksi, $_POST['satuan']);
+        $stok_min = mysqli_real_escape_string($koneksi, $_POST['stok_minimum']);
+        $stok_tersedia = mysqli_real_escape_string($koneksi, $_POST['stok_tersedia']);
+        $harga = mysqli_real_escape_string($koneksi, $_POST['harga_satuan']);
+        $kadaluarsa = mysqli_real_escape_string($koneksi, $_POST['tanggal_kadaluarsa']);
 
-    $kadaluarsa_sql = ($kadaluarsa) ? "'$kadaluarsa'" : 'NULL';
+        $kadaluarsa_sql = ($kadaluarsa) ? "'$kadaluarsa'" : 'NULL';
 
-    if ($id_post > 0) {
-        // UPDATE
-        $query = "UPDATE obat SET 
-                    kode_obat='$kode', nama_obat='$nama', kategori='$kategori', satuan='$satuan', 
-                    stok_minimum='$stok_min', stok_tersedia='$stok_tersedia', harga_satuan='$harga', 
-                    tanggal_kadaluarsa=$kadaluarsa_sql, updated_at=NOW() 
-                  WHERE id='$id_post'";
-        $redirect_status = 'updated';
-    } else {
-        // INSERT
-        $query = "INSERT INTO obat (kode_obat, nama_obat, kategori, satuan, stok_minimum, stok_tersedia, harga_satuan, tanggal_kadaluarsa, updated_at) 
-                  VALUES ('$kode', '$nama', '$kategori', '$satuan', '$stok_min', '$stok_tersedia', '$harga', $kadaluarsa_sql, NOW())";
-        $redirect_status = 'added';
-    }
+        if ($id_post > 0) {
+            // UPDATE
+            $query = "UPDATE obat SET 
+                        kode_obat='$kode', nama_obat='$nama', kategori='$kategori', satuan='$satuan', 
+                        stok_minimum='$stok_min', stok_tersedia='$stok_tersedia', harga_satuan='$harga', 
+                        tanggal_kadaluarsa=$kadaluarsa_sql, updated_at=NOW() 
+                      WHERE id='$id_post'";
+            $redirect_status = 'updated';
+        } else {
+            // INSERT
+            $query = "INSERT INTO obat (kode_obat, nama_obat, kategori, satuan, stok_minimum, stok_tersedia, harga_satuan, tanggal_kadaluarsa, updated_at) 
+                      VALUES ('$kode', '$nama', '$kategori', '$satuan', '$stok_min', '$stok_tersedia', '$harga', $kadaluarsa_sql, NOW())";
+            $redirect_status = 'added';
+        }
 
-    if (mysqli_query($koneksi, $query)) {
-        header("Location: master_obat.php?status=$redirect_status");
-        exit();
-    } else {
-        $pesan_status = "Gagal menyimpan data: " . mysqli_error($koneksi) . " ❌";
-        $tipe_alert = 'danger';
-        $data_edit = $_POST;
-        $data_edit['id'] = $id_post;
+        if (mysqli_query($koneksi, $query)) {
+            header("Location: master_obat.php?status=$redirect_status");
+            exit();
+        } else {
+            $pesan_status = "Gagal menyimpan data: " . mysqli_error($koneksi) . " ❌";
+            $tipe_alert = 'danger';
+            $data_edit = $_POST;
+            $data_edit['id'] = $id_post;
+        }
+    } 
+    
+    // =========================================================
+    // B. LOGIKA INPUT STOK MASUK DARI MODAL
+    // =========================================================
+    else if (isset($_POST['action']) && $_POST['action'] == 'tambah_stok') {
+        
+        // 1. Ambil dan Bersihkan Data
+        $obat_id = mysqli_real_escape_string($koneksi, $_POST['obat_id']);
+        $jumlah_masuk = (int)$_POST['jumlah_masuk'];
+        $keterangan = mysqli_real_escape_string($koneksi, $_POST['keterangan']);
+        $petugas = "Admin Farmasi"; // Ganti dengan data session user yang login
+
+        if ($jumlah_masuk <= 0) {
+            $pesan_status = "Gagal. Jumlah stok masuk harus lebih dari 0. ❌";
+            $tipe_alert = 'danger';
+        } else {
+            // Mulai Transaksi
+            mysqli_begin_transaction($koneksi);
+            
+            try {
+                // 2. Cek Stok Saat Ini (Untuk $stok_sebelum)
+                $q_check_stok = "SELECT stok_tersedia, nama_obat FROM obat WHERE id = '$obat_id'";
+                $r_check_stok = mysqli_query($koneksi, $q_check_stok);
+                $data_obat = mysqli_fetch_assoc($r_check_stok);
+                
+                if (!$data_obat) {
+                    throw new Exception("Obat tidak ditemukan dalam database.");
+                }
+                
+                $stok_saat_ini = $data_obat['stok_tersedia'];
+                $stok_sesudah = $stok_saat_ini + $jumlah_masuk;
+
+                // 3. UPDATE (PENAMBAHAN) STOK OBAT
+                $query_update_stok = "UPDATE obat SET 
+                    stok_tersedia = '$stok_sesudah', 
+                    updated_at = NOW() 
+                    WHERE id = '$obat_id'";
+                
+                if (!mysqli_query($koneksi, $query_update_stok)) {
+                    throw new Exception("Gagal menambahkan stok obat: " . mysqli_error($koneksi));
+                }
+
+                // 4. INSERT KE TABEL TRANSAKSI_OBAT (PENCATATAN MASUK)
+                $query_transaksi = "INSERT INTO transaksi_obat (
+                    obat_id, jenis_transaksi, jumlah, stok_sebelum, stok_sesudah, 
+                    resep_obat_id, tanggal_transaksi, keterangan, petugas
+                ) VALUES (
+                    '$obat_id', 'MASUK', '$jumlah_masuk', '$stok_saat_ini', '$stok_sesudah', 
+                    NULL, NOW(), '$keterangan', '$petugas'
+                )";
+                
+                if (!mysqli_query($koneksi, $query_transaksi)) {
+                    throw new Exception("Gagal menyimpan transaksi stok masuk: " . mysqli_error($koneksi));
+                }
+
+                mysqli_commit($koneksi);
+                // Redirect untuk menampilkan sukses
+                header("Location: master_obat.php?status=success_stok&obat=" . urlencode($data_obat['nama_obat']) . "&jumlah=$jumlah_masuk");
+                exit();
+
+            } catch (Exception $e) {
+                mysqli_rollback($koneksi);
+                $pesan_status = "Gagal memproses stok: " . $e->getMessage() . " ❌";
+                $tipe_alert = 'danger';
+            }
+        }
     }
 }
 
-// Logika Tampilkan Form Edit
+// --- Logika Tampilkan Form Edit ---
 $is_edit = false;
 $data_edit = [];
 if ($action == 'edit' && $id_edit > 0) {
@@ -79,7 +151,7 @@ if ($action == 'edit' && $id_edit > 0) {
     }
 }
 
-// Handle Status dari Redirect
+// --- Handle Status dari Redirect ---
 if (isset($_GET['status'])) {
     if ($_GET['status'] == 'added') {
         $pesan_status = "Data obat baru berhasil ditambahkan! ✅";
@@ -90,6 +162,11 @@ if (isset($_GET['status'])) {
     } elseif ($_GET['status'] == 'deleted') {
         $pesan_status = "Data obat berhasil dihapus! ✅";
         $tipe_alert = 'warning';
+    } elseif ($_GET['status'] == 'success_stok') { // LOGIKA BARU
+        $obat_nama = htmlspecialchars($_GET['obat'] ?? 'Obat');
+        $jumlah = htmlspecialchars($_GET['jumlah'] ?? 0);
+        $pesan_status = "Stok obat **$obat_nama** berhasil ditambahkan sebanyak $jumlah! ✅";
+        $tipe_alert = 'success';
     }
 }
 
@@ -114,7 +191,7 @@ $current_data = $is_edit ? $data_edit : null;
     <link rel="stylesheet" crossorigin href="../../assets/compiled/css/table-datatable.css">
     <link rel="stylesheet" crossorigin href="../../assets/compiled/css/app.css">
     <link rel="stylesheet" crossorigin href="../../assets/compiled/css/app-dark.css">
-</head>
+    </head>
 <body>
     <div id="app">
         <div id="sidebar"></div>
@@ -349,7 +426,19 @@ $current_data = $is_edit ? $data_edit : null;
                                             </span>
                                         </td>
                                         <td>
-                                            <a href="master_obat.php?action=edit&id=<?= $data['id']; ?>" class="btn btn-sm btn-warning me-1" title="Edit Data dan Lihat Detail">Edit</a>
+                                            <a href="master_obat.php?action=edit&id=<?= $data['id']; ?>" class="btn btn-sm btn-warning me-1" title="Edit Data dan Lihat Detail"><i class="bi bi-pencil"></i></a>
+                                            
+                                            <button type="button" 
+                                                class="btn btn-sm btn-success btn-tambah-stok"
+                                                data-id="<?= $data['id']; ?>"
+                                                data-nama="<?= htmlspecialchars($data['nama_obat']); ?>"
+                                                data-stok="<?= $stok_tersedia; ?>"
+                                                data-satuan="<?= htmlspecialchars($data['satuan']); ?>"
+                                                title="Tambah Stok Masuk"
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#stokMasukModal">
+                                                <i class="bi bi-box-arrow-in-up"></i>
+                                            </button>
                                         </td>
                                     </tr>
                                 <?php endwhile; ?>
@@ -361,8 +450,64 @@ $current_data = $is_edit ? $data_edit : null;
         </div>
     </div>
     
-    <script src="../../assets/extensions/simple-datatables/umd/simple-datatables.js"></script>
-    <script src="../../assets/static/js/pages/simple-datatables.js"></script> 
-    <script src="../../assets/compiled/js/app.js"></script>
+<div class="modal fade" id="stokMasukModal" tabindex="-1" aria-labelledby="stokMasukModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="master_obat.php" method="POST">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="stokMasukModalLabel"><i class="bi bi-box-arrow-in-up me-1"></i> Tambah Stok Obat</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="obat_id" id="modal_obat_id">
+                    <input type="hidden" name="action" value="tambah_stok">
+                    
+                    <p class="mb-1">Obat: <strong id="namaObatDisplay">N/A</strong></p>
+                    <p>Stok Saat Ini: <strong id="stokSaatIni" class="text-primary">N/A</strong></p>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Jumlah Stok Masuk *</label>
+                        <input type="number" class="form-control" name="jumlah_masuk" min="1" placeholder="Cth: 50" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Keterangan *</label>
+                        <textarea class="form-control" name="keterangan" rows="2" required placeholder="Cth: Pembelian dari Supplier PT. Farma Jaya, Invoice #123"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-success" name="simpan_stok_masuk"><i class="bi bi-save me-1"></i> Simpan Stok Masuk</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> 
+<script src="../../assets/extensions/simple-datatables/umd/simple-datatables.js"></script>
+<script src="../../assets/static/js/pages/simple-datatables.js"></script> 
+<script src="../../assets/compiled/js/app.js"></script>
+
+<script>
+    $(document).ready(function() {
+        // Event listener saat tombol "Tambah Stok" (di tabel) diklik
+        $('.btn-tambah-stok').on('click', function() {
+            const id = $(this).data('id');
+            const nama = $(this).data('nama');
+            const stok = $(this).data('stok');
+            const satuan = $(this).data('satuan');
+
+            // Isi data ke dalam Modal
+            $('#modal_obat_id').val(id);
+            $('#namaObatDisplay').text(nama);
+            $('#stokSaatIni').text(stok + ' ' + satuan);
+            
+            // Kosongkan form input stok sebelumnya
+            $('#stokMasukModal').find('input[name="jumlah_masuk"]').val('');
+            $('#stokMasukModal').find('textarea[name="keterangan"]').val('');
+        });
+    });
+</script>
 </body>
 </html>
