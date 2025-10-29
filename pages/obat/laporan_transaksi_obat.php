@@ -69,20 +69,25 @@ $query_laporan = "
 $result_laporan = mysqli_query($koneksi, $query_laporan);
 
 // Hitung total ringkasan
+// GANTI BLOCK PERHITUNGAN TOTAL INI
+// Hitung total ringkasan
 $total_masuk = 0;
 $total_keluar = 0;
 $data_laporan = [];
+
 if ($result_laporan) {
     while ($row = mysqli_fetch_assoc($result_laporan)) {
         $data_laporan[] = $row;
-        if ($row['jenis_transaksi'] == 'MASUK') {
-            $total_masuk += $row['jumlah'];
-        } elseif ($row['jenis_transaksi'] == 'KELUAR') {
-            $total_keluar += $row['jumlah'];
+        
+        // *** PERUBAHAN KRUSIAL: Tambahkan intval() dan trim() ***
+        // Trim() menghilangkan spasi tak terlihat, strtoupper() memastikan case-sensitive-ness
+        if (strtoupper(trim($row['jenis_transaksi'])) == 'MASUK') { 
+            $total_masuk += intval($row['jumlah']); // Memaksa nilai menjadi integer
+        } elseif (strtoupper(trim($row['jenis_transaksi'])) == 'KELUAR') {
+            $total_keluar += intval($row['jumlah']); // Memaksa nilai menjadi integer
         }
     }
 }
-
 
 // --- TAMPILAN PRINT JIKA DITEKAN (dihilangkan dari sini demi keringkasan) ---
 if ($is_print_view) {
@@ -245,7 +250,7 @@ if ($is_print_view) {
                         <div class="summary-card summary-card-masuk d-flex align-items-center">
                             <i class="bi bi-box-arrow-in-up-fill fs-1 me-3 opacity-75"></i>
                             <div>
-                                <small class="text-muted">Total Stok **Masuk** (Unit)</small>
+                                <small class="text-muted">Total Stok <strong>Masuk</strong> (Unit)</small>
                                 <h3 class="mb-0 fw-bold"><?= number_format($total_masuk, 0, ',', '.') ?></h3>
                             </div>
                         </div>
@@ -254,7 +259,7 @@ if ($is_print_view) {
                         <div class="summary-card summary-card-keluar d-flex align-items-center">
                             <i class="bi bi-box-arrow-out-down-fill fs-1 me-3 opacity-75"></i>
                             <div>
-                                <small class="text-muted">Total Stok **Keluar** (Unit)</small>
+                                <small class="text-muted">Total Stok <strong>Keluar</strong> (Unit)</small>
                                 <h3 class="mb-0 fw-bold"><?= number_format($total_keluar, 0, ',', '.') ?></h3>
                             </div>
                         </div>
@@ -281,21 +286,30 @@ if ($is_print_view) {
                                     <th>Petugas</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                             <tbody>
                                 <?php $no = 1; foreach ($data_laporan as $data): ?>
                                 <?php 
-                                    $is_masuk = $data['jenis_transaksi'] == 'MASUK';
-                                    $jenis_badge = $is_masuk ? 'success' : 'danger';
+                                    // Logika untuk menentukan warna badge dan class baris
+                                    $is_masuk = strtoupper(trim($data['jenis_transaksi'])) == 'MASUK';
+                                    
+                                    // PENTING: Mengubah warna badge
+                                    $jenis_badge = $is_masuk ? 'success' : 'danger'; // success = hijau, danger = merah
+                                    
                                     $jenis_icon = $is_masuk ? '➕' : '➖';
+                                    $row_class = $is_masuk ? 'tr-masuk' : 'tr-keluar';
                                 ?>
-                                <tr>
+                                <tr class="<?= $row_class ?>">
                                     <td><?= $no++; ?></td>
+                                    
                                     <td><?= date('d/m/Y H:i', strtotime($data['tanggal_transaksi'])) ?></td>
+                                    
                                     <td>
                                         <strong><?= htmlspecialchars($data['nama_obat']); ?></strong><br>
                                         <small class="text-muted"><?= htmlspecialchars($data['kode_obat']); ?></small>
                                     </td>
-                                    <td><span class="badge bg-<?= $jenis_badge ?>"><?= $jenis_icon ?> <?= $data['jenis_transaksi'] ?></span></td>
+                                    
+                                    <td><span class="badge bg-<?= $jenis_badge ?>"><?= $jenis_icon ?> <?= htmlspecialchars($data['jenis_transaksi']) ?></span></td>
+                                    
                                     <td><strong class="text-<?= $jenis_badge ?>"><?= number_format($data['jumlah'], 0, ',', '.') ?></strong> <?= htmlspecialchars($data['satuan']) ?></td>
                                     <td class="text-muted"><?= number_format($data['stok_sebelum'], 0, ',', '.') ?></td>
                                     <td class="fw-bold"><?= number_format($data['stok_sesudah'], 0, ',', '.') ?></td>
@@ -303,7 +317,7 @@ if ($is_print_view) {
                                     <td><?= htmlspecialchars($data['petugas']) ?></td>
                                 </tr>
                                 <?php endforeach; ?>
-                            </tbody>
+                            </tbody>    
                         </table>
                         
                         <?php if (count($data_laporan) == 0): ?>
