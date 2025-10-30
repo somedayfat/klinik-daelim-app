@@ -328,6 +328,10 @@ if ($is_print_view) {
                                     <a href="master_obat.php" class="submenu-link">Data Obat</a>
                                 </li>
                                 
+                                <li class="submenu-item">
+                                    <a href="laporan_stok_master.php" class="submenu-link">Laporan Stok Obat</a> 
+                                </li>
+                                
                                 <li class="submenu-item active">
                                     <a href="laporan_transaksi_obat.php" class="submenu-link">Laporan Mutasi Obat</a>
                                 </li>              

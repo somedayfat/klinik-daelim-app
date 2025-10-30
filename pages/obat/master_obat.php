@@ -275,7 +275,7 @@ $current_data = $is_edit ? $data_edit : null;
                     </li>
                      -->
                     <li class="submenu-item  ">
-                        <a href="../karyawan/form_kecelakaan_kerja.php" class="submenu-link">Kecelakaan Kerja</a>
+                        <a href="../karyawan/riwayat_kecelakaan.php" class="submenu-link">Kecelakaan Kerja</a>
                         
                     </li>
                 </ul>

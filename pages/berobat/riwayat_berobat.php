@@ -140,7 +140,7 @@ if (!$result) {
                     </li>
                      -->
                     <li class="submenu-item  ">
-                        <a href="../karyawan/riwayat_kecelakaan.phpp" class="submenu-link">Kecelakaan Kerja</a>
+                        <a href="../karyawan/riwayat_kecelakaan.php" class="submenu-link">Kecelakaan Kerja</a>
                         
                     </li>
                 </ul>
