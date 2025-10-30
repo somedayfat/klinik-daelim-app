@@ -1,296 +1,240 @@
-<?php
-session_start();
-include('../../config/koneksi.php');
-
-// --- LOGIKA SIMPAN DATA (INSERT ke tabel berobat) ---
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // Ambil dan bersihkan data dari form
-    $id_card = mysqli_real_escape_string($koneksi, $_POST['id_card']);
-    $keluhan = mysqli_real_escape_string($koneksi, $_POST['keluhan']);
-    $diagnosis = mysqli_real_escape_string($koneksi, $_POST['diagnosis']);
-    $tekanan_darah = mysqli_real_escape_string($koneksi, $_POST['tekanan_darah']);
-    $suhu_tubuh = mysqli_real_escape_string($koneksi, $_POST['suhu_tubuh']);
-    $tindakan = mysqli_real_escape_string($koneksi, $_POST['tindakan']);
-    $rujukan = mysqli_real_escape_string($koneksi, $_POST['rujukan']);
-    $catatan = mysqli_real_escape_string($koneksi, $_POST['catatan']);
-    
-    // Petugas (Ganti dengan data sesi user login yang sebenarnya)
-    $petugas = isset($_POST['petugas']) ? mysqli_real_escape_string($koneksi, $_POST['petugas']) : 'Petugas Default (Sesi)'; 
-    $tanggal_berobat = date("Y-m-d H:i:s"); 
-
-    // Query INSERT data
-    $query = "INSERT INTO berobat (id_card, tanggal_berobat, keluhan, diagnosis, tekanan_darah, suhu_tubuh, tindakan, rujukan, catatan, petugas, created_at) 
-              VALUES ('$id_card', '$tanggal_berobat', '$keluhan', '$diagnosis', '$tekanan_darah', '$suhu_tubuh', '$tindakan', '$rujukan', '$catatan', '$petugas', NOW())";
-
-    if (mysqli_query($koneksi, $query)) {
-        // REDIRECT OTOMATIS setelah sukses simpan
-        header("Location: riwayat_berobat.php?status=success_add"); 
-        exit();
-    } else {
-        // Jika gagal, tampilkan pesan error di halaman ini
-        $pesan_status = "Gagal menyimpan data pemeriksaan: " . mysqli_error($koneksi) . " ❌";
-        $tipe_alert = 'danger';
-    }
-}
-
-// Query untuk mengambil semua data karyawan (untuk modal pencarian)
-$karyawan_query = "SELECT id_card, nama, jabatan, departemen FROM karyawan ORDER BY nama ASC";
-$karyawan_result = mysqli_query($koneksi, $karyawan_query);
-?>
-
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Riwayat Laporan Kecelakaan Kerja</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
+    
+    <link rel="shortcut icon" href="data:image/svg+xml,%3csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2033%2034'%20fill-rule='evenodd'%20stroke-linejoin='round'%20stroke-miterlimit='2'%20xmlns:v='https://vecta.io/nano'%3e%3cpath%20d='M3%2027.472c0%204.409%206.18%205.552%2013.5%205.552%207.281%200%2013.5-1.103%2013.5-5.513s-6.179-5.552-13.5-5.552c-7.281%200-13.5%201.103-13.5%205.513z'%20fill='%23435ebe'%20fill-rule='nonzero'/%3e%3ccircle%20cx='16.5'%20cy='8.8'%20r='8.8'%20fill='%2341bbdd'/%3e%3c/svg%3e" type="image/x-icon">
+    <link rel="shortcut icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACEAAAAiCAYAAADRcLDBAAAEs2lUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4KPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iWE1QIENvcmUgNS41LjAiPgogPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4KICA8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIgogICAgeG1sbnM6ZXhpZj0iaHR0cDovL25zLmFkb2JlLmNvbS9leGlmLzEuMC8iCiAgICB4bWxuczp0aWZmPSJodHRwOi8vbnMuYWRvYmUuY29tL3RpZmYvMS4wLyIKICAgIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIKICAgIHhtbG5zOnhtcD0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wLyIKICAgIHhtbG5zOnhtcE1NPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvbW0vIgogICAgeG1sbnM6c3RFdnQ9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZUV2ZW50IyIKICAgZXhpZjpQaXhlbFhEaW1lbnNpb249IjMzIgogICBleGlmOlBpeGVsWURpbWVuc2lvbj0iMzQiCiAgIGV4aWY6Q29sb3JTcGFjZT0iMSIKICAgdGlmZjpJbWFnZVdpZHRoPSIzMyIKICAgdGlmZjpJbWFnZUxlbmd0aD0iMzQiCiAgIHRpZmY6UmVzb2x1dGlvblVuaXQ9IjIiCiAgIHRpZmY6WFJlc29sdXRpb249Ijk2LjAiCiAgIHRpZmY6WVJlc29sdXRpb249Ijk2LjAiCiAgIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiCiAgIHBob3Rvc2hvcDpJQ0NQcm9maWxlPSJzUkdCIElFQzYxOTY2LTIuMSIKICAgeG1wOk1vZGlmeURhdGU9IjIwMjItMDMtMzFUMTA6NTA6MjMrMDI6MDAiCiAgIHhtcDpNZXRhZGF0YURhdGU9IjIwMjItMDMtMzFUMTA6NTA6MjMrMDI6MDAiPgogICA8eG1wTU06SGlzdG9yeT4KICAgIDxyZGY6U2VxPgogICAgIDxyZGY6bGkKICAgICAgc3RFdnQ6YWN0aW9uPSJwcm9kdWNlZCIKICAgICAgc3RFdnQ6c29mdHdhcmVBZ2VudD0iQWZmaW5pdHkgRGVzaWduZXIgMS4xMC4xIgogICAgICBzdEV2dDp3aGVuPSIyMDIyLTAzLTMxVDEwOjUwOjIzKzAyOjAwIi8+CiAgICA8L3JkZjpTZXE+CiAgIDwveG1wTU06SGlzdG9yeT4KICA8L3JkZjpEZXNjcmlwdGlvbj4KIDwvcmRmOlJERj4KPC94OnhtcG1ldGE+Cjw/eHBhY2tldCBlbmQ9InIiPz5V57uAAAABgmlDQ1BzUkdCIElFQzYxOTY2LTIuMQAAKJF1kc8rRFEUxz9maORHo1hYKC9hISNGTWwsRn4VFmOUX5uZZ36oeTOv954kW2WrKLHxa8FfwFZZK0WkZClrYoOe87ypmWTO7dzzud97z+nec8ETzaiaWd4NWtYyIiNhZWZ2TvE946WZSjqoj6mmPjE1HKWkfdxR5sSbgFOr9Ll/rXoxYapQVik8oOqGJTwqPL5i6Q5vCzeo6dii8KlwpyEXFL519LjLLw6nXP5y2IhGBsFTJ6ykijhexGra0ITl5bRqmWU1fx/nJTWJ7PSUxBbxJkwijBBGYYwhBgnRQ7/MIQIE6ZIVJfK7f/MnyUmuKrPOKgZLpEhj0SnqslRPSEyKnpCRYdXp/9++msneoFu9JgwVT7b91ga+LfjetO3PQ9v+PgLvI1xkC/m5A+h7F32zoLXug38dzi4LWnwHzjeg8UGPGbFfySvuSSbh9QRqZ6H+Gqrm3Z7l9zm+h+iafNUV7O5Bu5z3L/wAdthn7QIme0YAAAAJcEhZcwAADsQAAA7EAZUrDhsAAAJTSURBVFiF7Zi9axRBGIefEw2IdxFBRQsLWUTBaywSK4ubdSGVIY1Y6HZql8ZKCGIqwX/AYLmCgVQKfiDn7jZeEQMWfsSAHAiKqPiB5mIgELWYOW5vzc3O7niHhT/YZvY37/swM/vOzJbIqVq9uQ04CYwCI8AhYAlYAB4Dc7HnrOSJWcoJcBS4ARzQ2F4BZ2LPmTeNuykHwEWgkQGAet9QfiMZjUSt3hwD7psGTWgs9pwH1hC1enMYeA7sKwDxBqjGnvNdZzKZjqmCAKh+U1kmEwi3IEBbIsugnY5avTkEtIAtFhBrQCX2nLVehqyRqFoCAAwBh3WGLAhbgCRIYYinwLolwLqKUwwi9pxV4KUlxKKKUwxC6ZElRCPLYAJxGfhSEOCz6m8HEXvOB2CyIMSk6m8HoXQTmMkJcA2YNTHm3congOvATo3tE3A29pxbpnFzQSiQPcB55IFmFNgFfEQeahaAGZMpsIJIAZWAHcDX2HN+2cT6r39GxmvC9aPNwH5gO1BOPFuBVWAZue0vA9+A12EgjPadnhCuH1WAE8ivYAQ4ohKaagV4gvxi5oG7YSA2vApsCOH60WngKrA3R9IsvQUuhIGY00K4flQG7gHH/mLytB4C42EgfrQb0mV7us8AAMeBS8mGNMR4nwHamtBB7B4QRNdaS0M8GxDEog7iyoAguvJ0QYSBuAOcAt71Kfl7wA8DcTvZ2KtOlJEr+ByyQtqqhTyHTIeB+ONeqi3brh+VgIN0fohUgWGggizZFTplu12yW8iy/YLOGWMpDMTPXnl+Az9vj2HERYqPAAAAAElFTkSuQmCC" type="image/png">
+    
+    <link rel="stylesheet" href="../../assets/extensions/simple-datatables/style.css">
+    <link rel="stylesheet" crossorigin href="../../assets/compiled/css/table-datatable.css">
     <link rel="stylesheet" crossorigin href="../../assets/compiled/css/app.css">
     <link rel="stylesheet" crossorigin href="../../assets/compiled/css/app-dark.css">
-    <link rel="stylesheet" href="../../assets/extensions/simple-datatables/style.css"> 
-    <link rel="stylesheet" crossorigin href="../../assets/compiled/css/table-datatable.css">
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 </head>
 
 <body>
+    <script src="../../assets/static/js/initTheme.js"></script>
     <div id="app">
-        <div id="sidebar"></div>
-
-        <div id="main">
-            <header class="mb-3"></header>
-
-            <div class="page-heading">
-                <h3>Input Pemeriksaan Baru</h3>
-                <p class="text-subtitle text-muted">Formulir untuk mencatat pemeriksaan medis pasien (karyawan).</p>
+        <div id="sidebar">
+            <div class="sidebar-wrapper active">
+    <div class="sidebar-header position-relative">
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="logo">
+                <a href="../../"><img src="../../assets/images/logo.PNG" alt="Logo" srcset=""></a>
             </div>
-
-            <section class="section">
-                <div class="card">
-                    <div class="card-header">
-                        <h4 class="card-title">Form Pemeriksaan Pasien</h4>
-                    </div>
-                    <div class="card-body">
-
-                        <?php if (isset($pesan_status) && $pesan_status): ?>
-                            <div class="alert alert-<?= $tipe_alert ?> alert-dismissible fade show" role="alert">
-                                <?= $pesan_status ?>
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                            </div>
-                        <?php endif; ?>
-
-                        <form action="form_pemeriksaan.php" method="POST" class="form-horizontal">
-                            <div class="row">
-
-                                <div class="col-md-6 col-12">
-                                    <h5 class="mt-2 text-primary">Data Pasien & Tanda Vital</h5>
-                                    <hr class="mt-0">
-                                    
-                                    <div class="mb-3">
-                                        <label for="id_card_display" class="form-label">ID Card Pasien *</label>
-                                        <div class="input-group">
-                                            <input type="hidden" id="id_card" name="id_card" required>
-                                            <input type="text" class="form-control" id="id_card_display" placeholder="Pilih ID Card" readonly required>
-                                            <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#modalCariKaryawan">
-                                                <i class="bi bi-search"></i> Cari Karyawan
-                                            </button>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="mb-3">
-                                        <label for="nama_lengkap_display" class="form-label">Nama Pasien</label>
-                                        <input type="text" class="form-control" id="nama_lengkap_display" placeholder="Nama lengkap karyawan" readonly>
-                                    </div>
-
-                                    <div class="row">
-                                        <div class="col-md-6 mb-3">
-                                            <label for="tekanan_darah" class="form-label">Tekanan Darah (Sistolik/Diastolik)</label>
-                                            <input type="text" class="form-control" id="tekanan_darah" name="tekanan_darah" placeholder="cth: 120/80">
-                                        </div>
-                                        <div class="col-md-6 mb-3">
-                                            <label for="suhu_tubuh" class="form-label">Suhu Tubuh (°C)</label>
-                                            <input type="number" step="0.1" class="form-control" id="suhu_tubuh" name="suhu_tubuh" placeholder="cth: 36.5">
-                                        </div>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label for="keluhan" class="form-label">Keluhan *</label>
-                                        <textarea class="form-control" id="keluhan" name="keluhan" rows="2" required placeholder="cth: Demam, Sakit kepala, Batuk"></textarea>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label for="diagnosis" class="form-label">Diagnosis</label>
-                                        <input type="text" class="form-control" id="diagnosis" name="diagnosis" placeholder="cth: ISPA, Gastritis, Common Cold">
-                                    </div>
-
-                                </div>
-
-                                <div class="col-md-6 col-12">
-                                    <h5 class="mt-2 text-primary">Informasi Kritis & Tindakan</h5>
-                                    <hr class="mt-0">
-                                    
-                                    <div class="mb-3">
-                                        <div class="alert alert-warning" id="alergi-box" role="alert">
-                                            <h6 class="alert-heading mb-1"><i class="bi bi-exclamation-triangle-fill"></i> Riwayat Medis Statis</h6>
-                                            <p class="mb-0">
-                                                Penyakit Terdahulu: <strong id="data_penyakit">Pilih pasien untuk memuat data.</strong><br>
-                                                Alergi: <strong id="data_alergi">Pilih pasien untuk memuat data.</strong><br>
-                                                Golongan Darah: <strong id="data_golongan_darah">Pilih pasien untuk memuat data.</strong>
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label for="tindakan" class="form-label">Tindakan / Pemberian Obat *</label>
-                                        <textarea class="form-control" id="tindakan" name="tindakan" rows="3" required placeholder="cth: Paracetamol 500mg, Istirahat 1 hari"></textarea>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label for="rujukan" class="form-label">Rujukan</label>
-                                        <input type="text" class="form-control" id="rujukan" name="rujukan" placeholder="cth: RS Sentosa (Jika dirujuk)">
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label for="catatan" class="form-label">Catatan Tambahan</label>
-                                        <textarea class="form-control" id="catatan" name="catatan" rows="1" placeholder="Informasi pendukung lain"></textarea>
-                                    </div>
-
-                                    <?php $nama_petugas_saat_ini = 'Dokter/Suster'; ?>
-                                    <input type="hidden" name="petugas" value="<?= htmlspecialchars($nama_petugas_saat_ini) ?>">
-                                    
-                                </div>
-                            </div>
-                            <div class="col-12 d-flex justify-content-end border-top pt-3 mt-3"> 
-                                <button type="submit" class="btn btn-primary me-1 mb-1">Simpan Pemeriksaan</button> 
-                                <a href="riwayat_berobat.php" class="btn btn-secondary me-1 mb-1">Kembali ke Daftar</a> 
-                                <button type="reset" class="btn btn-light-secondary mb-1">Reset Form</button> 
-                            </div>
-                            <!-- <div class="col-12 d-flex justify-content-end border-top pt-3 mt-3">
-                                <button type="submit" class="btn btn-primary me-1 mb-1">Simpan Pemeriksaan</button>
-                                <button type="reset" class="btn btn-light-secondary mb-1">Batal/Reset</button>
-                            </div> -->
-                        </form>
-
-                    </div>
+            <div class="theme-toggle d-flex gap-2  align-items-center mt-2">
+                <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true"
+                    role="img" class="iconify iconify--system-uicons" width="20" height="20"
+                    preserveAspectRatio="xMidYMid meet" viewBox="0 0 21 21">
+                    <g fill="none" fill-rule="evenodd" stroke="currentColor" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path
+                            d="M10.5 14.5c2.219 0 4-1.763 4-3.982a4.003 4.003 0 0 0-4-4.018c-2.219 0-4 1.781-4 4c0 2.219 1.781 4 4 4zM4.136 4.136L5.55 5.55m9.9 9.9l1.414 1.414M1.5 10.5h2m14 0h2M4.135 16.863L5.55 15.45m9.899-9.9l1.414-1.415M10.5 19.5v-2m0-14v-2"
+                            opacity=".3"></path>
+                        <g transform="translate(-210 -1)">
+                            <path d="M220.5 2.5v2m6.5.5l-1.5 1.5"></path>
+                            <circle cx="220.5" cy="11.5" r="4"></circle>
+                            <path d="m214 5l1.5 1.5m5 14v-2m6.5-.5l-1.5-1.5M214 18l1.5-1.5m-4-5h2m14 0h2"></path>
+                        </g>
+                    </g>
+                </svg>
+                <div class="form-check form-switch fs-6">
+                    <input class="form-check-input  me-0" type="checkbox" id="toggle-dark" style="cursor: pointer">
+                    <label class="form-check-label"></label>
                 </div>
-            </section>
-            
-            <div class="modal fade" id="modalCariKaryawan" tabindex="-1" aria-labelledby="modalCariKaryawanLabel" aria-hidden="true">
-                <div class="modal-dialog modal-lg">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title" id="modalCariKaryawanLabel">Pilih Data Karyawan (Pasien)</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body">
-                            <table class="table table-striped" id="tabelPilihKaryawan">
-                                <thead class="table-dark">
-                                    <tr>
-                                        <th>ID-Card</th>
-                                        <th>Nama</th>
-                                        <th>Jabatan</th>
-                                        <th>Departemen</th>
-                                        <th>Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php 
-                                    mysqli_data_seek($karyawan_result, 0); 
-                                    while($data = mysqli_fetch_assoc($karyawan_result)): ?>
-                                        <tr>
-                                            <td><?= $data['id_card'] ?></td>
-                                            <td><?= $data['nama'] ?></td>
-                                            <td><?= $data['jabatan'] ?></td>
-                                            <td><?= $data['departemen'] ?></td>
-                                            <td>
-                                                <button type="button" class="btn btn-sm btn-success btn-pilih-karyawan" 
-                                                    data-id="<?= $data['id_card'] ?>" 
-                                                    data-nama="<?= htmlspecialchars($data['nama']) ?>">Pilih</button>
-                                            </td>
-                                        </tr>
-                                    <?php endwhile; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true"
+                    role="img" class="iconify iconify--mdi" width="20" height="20" preserveAspectRatio="xMidYMid meet"
+                    viewBox="0 0 24 24">
+                    <path fill="currentColor"
+                        d="m17.75 4.09l-2.53 1.94l.91 3.06l-2.63-1.81l-2.63 1.81l.91-3.06l-2.53-1.94L12.44 4l1.06-3l1.06 3l3.19.09m3.5 6.91l-1.64 1.25l.59 1.98l-1.7-1.17l-1.7 1.17l.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95l2.06.05m-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85c-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14c.4-.4.82-.76 1.27-1.08c.75-.53 1.93.36 1.85 1.19c-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82c-2.81 3.14-2.7 7.96.31 10.98c3.02 3.01 7.84 3.12 10.98.31Z">
+                    </path>
+                </svg>
             </div>
-            <footer></footer>
+            <div class="sidebar-toggler  x">
+                <a href="#" class="sidebar-hide d-xl-none d-block"><i class="bi bi-x bi-middle"></i></a>
+            </div>
         </div>
     </div>
-    
+    <div class="sidebar-menu">
+        <ul class="menu">
+            <li class="sidebar-title">Menu</li>
+            
+            <li
+                class="sidebar-item active ">
+                <a href="../../" class='sidebar-link'>
+                    <i class="bi bi-grid-fill"></i>
+                    <span>Dashboard</span>
+                </a>
+                
+
+            </li>
+            
+            <li
+                class="sidebar-item">
+                <a href="../karyawan/karyawan.php" class='sidebar-link'>
+                    <i class="bi bi-stack"></i>
+                    <span>Data Karyawan</span>
+                </a>
+            <li
+                class="sidebar-item  has-sub">
+                <a href="#" class='sidebar-link'>
+                    <i class="bi bi-collection-fill"></i>
+                    <span>Pelayanan Kesehatan</span>
+                </a>
+                
+                <ul class="submenu ">
+                    
+                    <li class="submenu-item  ">
+                        <a href="../berobat/riwayat_berobat.php" class="submenu-link">Pemeriksaan Pasien</a>
+                        
+                    </li>
+                    
+                    <!-- <li class="submenu-item  ">
+                        <a href="pages/berobat/riwayat_berobat.php" class="submenu-link">Riwayat Medis</a>
+                        
+                    </li>
+                     -->
+                    <li class="submenu-item  ">
+                        <a href="../karyawan/form_kecelakaan_kerja.php" class="submenu-link">Kecelakaan Kerja</a>
+                        
+                    </li>
+                </ul>
+                
+
+            </li>
+            
+            <li
+                class="sidebar-item  has-sub">
+                <a href="#" class='sidebar-link'>
+                    <i class="bi bi-grid-1x2-fill"></i>
+                    <span>Manajemen Obat</span>
+                </a>
+                
+                <ul class="submenu ">
+                    
+                    <li class="submenu-item  ">
+                        <a href="pages/obat/master_obat.php" class="submenu-link">Data Obat</a>
+                        
+                    </li>
+                    
+                    <li class="submenu-item  ">
+                        <a href="pages/obat/laporan_transaksi_obat.php" class="submenu-link">Laporan Transaksi Obat</a>                     
+                    </li>              
+                </ul>
+            </li>
+            
+            <li
+                class="sidebar-item  ">
+                <a href="form-layout.html" class='sidebar-link'>
+                    <i class="bi bi-file-earmark-medical-fill"></i>
+                    <span>Laporan Klinik</span>
+                </a>
+                
+
+            </li>
+            
+            <li
+                class="sidebar-item  has-sub">
+                <a href="#" class='sidebar-link'>
+                    <i class="bi bi-person-circle"></i>
+                    <span>Account</span>
+                </a>
+                
+                <ul class="submenu ">
+                    
+                    <li class="submenu-item  ">
+                        <a href="account-profile.html" class="submenu-link">Profile</a>
+                        
+                    </li>
+                    
+                    <li class="submenu-item  ">
+                        <a href="account-security.html" class="submenu-link">Security</a>
+                        
+                    </li>
+                    
+                </ul>
+                
+
+            </li>
+            
+            <li
+                class="sidebar-item  has-sub">
+                <a href="#" class='sidebar-link'>
+                    <i class="bi bi-person-badge-fill"></i>
+                    <span>Authentication</span>
+                </a>
+                
+                <ul class="submenu ">
+                    
+                    <li class="submenu-item  ">
+                        <a href="auth-login.html" class="submenu-link">Login</a>
+                        
+                    </li>
+                    
+                    <li class="submenu-item  ">
+                        <a href="auth-register.html" class="submenu-link">Register</a>
+                        
+                    </li>
+                    
+                    <li class="submenu-item  ">
+                        <a href="auth-forgot-password.html" class="submenu-link">Forgot Password</a>
+                        
+                    </li>
+                    
+                </ul>
+                
+
+            </li>
+            
+            
+        </ul>
+    </div>
+</div>
+        </div>
+        <div id="main">
+            <header class="mb-3">
+                <a href="#" class="burger-btn d-block d-xl-none">
+                    <i class="bi bi-justify fs-3"></i>
+                </a>
+            </header>
+            <!-- TEMPAT ISI DATA -->
+
+
+
+
+
+
+            <!-- TEMPAT ISI DATA -->
+            <footer>
+    <div class="footer clearfix mb-0 text-muted">
+        <div class="float-start">
+            <p>2025 &copy; Daelim</p>
+        </div>
+        <div class="float-end">
+            <p>Crafted with <span class="text-danger"><i class="bi bi-heart-fill icon-mid"></i></span>
+                by <a href="https://daelim.id">IT PT. Daelim Indonesia</a></p>
+        </div>
+    </div>
+</footer>
+        </div>
+    </div>
+    <script src="../../assets/static/js/components/dark.js"></script>
     <script src="../../assets/extensions/perfect-scrollbar/perfect-scrollbar.min.js"></script>
+    
+    
     <script src="../../assets/compiled/js/app.js"></script>
     
-    <script src="../../assets/extensions/simple-datatables/umd/simple-datatables.js"></script>
-    <script>
-        // Inisialisasi Simple-Datatables untuk tabel di modal
-        let tableKaryawan = new simpleDatatables.DataTable(document.getElementById('tabelPilihKaryawan'));
-        
-        // Fungsi untuk mengambil data riwayat medis via AJAX
-        function fetchRiwayatMedis(idCard) {
-            const penyakitEl = document.getElementById('data_penyakit'); 
-            const alergiEl = document.getElementById('data_alergi');
-            const golDarahEl = document.getElementById('data_golongan_darah');
-            const alergiBox = document.getElementById('alergi-box');
-            
-            // Set status loading
-            penyakitEl.innerText = 'Memuat...'; 
-            alergiEl.innerText = 'Memuat...';
-            golDarahEl.innerText = 'Memuat...';
-            alergiBox.classList.remove('alert-danger', 'alert-warning', 'alert-success');
-            alergiBox.classList.add('alert-warning');
 
-            fetch('get_riwayat_medis_ajax.php?id_card=' + idCard)
-                .then(response => response.json())
-                .then(data => {
-                    // Isi data dari response
-                    penyakitEl.innerText = data.penyakit_terdahulu; 
-                    alergiEl.innerText = data.alergi;
-                    golDarahEl.innerText = data.golongan_darah;
-                    
-                    // Logic untuk ganti warna box berdasarkan Alergi/Penyakit Terdahulu
-                    
-                    const hasAlergi = data.alergi.toLowerCase() !== 'tidak ada' && data.alergi.toLowerCase() !== 'belum ada data';
-                    const hasPenyakit = data.penyakit_terdahulu.toLowerCase() !== 'tidak ada' && data.penyakit_terdahulu.toLowerCase() !== 'belum ada data';
-                    
-                    if (data.status === 'success' && (hasAlergi || hasPenyakit)) {
-                        // Alergi atau Penyakit DITEMUKAN: KRITIS
-                        alergiBox.classList.remove('alert-warning', 'alert-success');
-                        alergiBox.classList.add('alert-danger');
-                    } else if (data.status === 'success') {
-                         // Riwayat diisi, tapi tidak ada alergi/penyakit: AMAN
-                        alergiBox.classList.remove('alert-danger', 'alert-warning');
-                        alergiBox.classList.add('alert-success');
-                    } else {
-                        // BELUM ADA DATA: PERINGATAN (Warning)
-                        alergiBox.classList.remove('alert-danger', 'alert-success');
-                        alergiBox.classList.add('alert-warning'); 
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching riwayat medis:', error);
-                    penyakitEl.innerText = 'Gagal memuat';
-                    alergiEl.innerText = 'Gagal memuat';
-                    golDarahEl.innerText = 'Gagal memuat';
-                });
-        }
+    
+<!-- Need: Apexcharts -->
+<script src="../../assets/extensions/apexcharts/apexcharts.min.js"></script>
+<script src="../../assets/static/js/pages/dashboard.js"></script>
 
-        // Event listener saat tombol 'Pilih' di modal diklik
-        document.getElementById('tabelPilihKaryawan').addEventListener('click', function(e) {
-            if (e.target.classList.contains('btn-pilih-karyawan')) {
-                const idCard = e.target.getAttribute('data-id');
-                const nama = e.target.getAttribute('data-nama');
-                
-                // 1. Isi field di form utama
-                document.getElementById('id_card').value = idCard; // Input Hidden (untuk POST)
-                document.getElementById('id_card_display').value = idCard; 
-                document.getElementById('nama_lengkap_display').value = nama;
-                
-                // 2. Panggil fungsi untuk mengambil data riwayat medis (AJAX)
-                fetchRiwayatMedis(idCard);
-
-                // 3. Tutup modal
-                var modal = bootstrap.Modal.getInstance(document.getElementById('modalCariKaryawan'));
-                modal.hide();
-            }
-        });
-    </script>
 </body>
+
 </html>

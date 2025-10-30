@@ -134,11 +134,14 @@ if (isset($_POST['update'])) {
             
             <li
                 class="sidebar-item active ">
-                <a href="index.html" class='sidebar-link'>
+                <a href="../../" class='sidebar-link'>
                     <i class="bi bi-grid-fill"></i>
                     <span>Dashboard</span>
-                </a>   
+                </a>
+                
+
             </li>
+            
             <li
                 class="sidebar-item">
                 <a href="karyawan.php" class='sidebar-link'>
@@ -151,25 +154,21 @@ if (isset($_POST['update'])) {
                     <i class="bi bi-collection-fill"></i>
                     <span>Pelayanan Kesehatan</span>
                 </a>
-
+                
                 <ul class="submenu ">
                     
                     <li class="submenu-item  ">
-                        <a href="layout-default.html" class="submenu-link">Pemeriksaan Pasien</a>
+                        <a href="../berobat/riwayat_berobat.php" class="submenu-link">Pemeriksaan Pasien</a>
                         
                     </li>
                     
                     <li class="submenu-item  ">
-                        <a href="layout-default.html" class="submenu-link">Riwayat Medis</a>
-                        
-                    </li>
-                    
-                    <li class="submenu-item  ">
-                        <a href="layout-default.html" class="submenu-link">Kecelakaan Kerja</a>
+                        <a href="form_kecelakaan_kerja.php" class="submenu-link">Kecelakaan Kerja</a>
                         
                     </li>
                 </ul>
                 
+
             </li>
             
             <li
@@ -182,19 +181,13 @@ if (isset($_POST['update'])) {
                 <ul class="submenu ">
                     
                     <li class="submenu-item  ">
-                        <a href="layout-default.html" class="submenu-link">Data Obat</a>
+                        <a href="../obat/master_obat.php" class="submenu-link">Data Obat</a>
                         
                     </li>
                     
                     <li class="submenu-item  ">
-                        <a href="layout-default.html" class="submenu-link">Resep Obat</a>
-                        
-                    </li>
-                    
-                    <li class="submenu-item  ">
-                        <a href="layout-default.html" class="submenu-link">Transaksi Obat</a>
-                        
-                    </li>       
+                        <a href="../obat/laporan_transaksi_obat.php" class="submenu-link">Laporan Transaksi Obat</a>                     
+                    </li>              
                 </ul>
             </li>
             

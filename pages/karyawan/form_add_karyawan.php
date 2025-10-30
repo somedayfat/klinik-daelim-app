@@ -1,8 +1,12 @@
+<?php
+include('../../config/koneksi.php')
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 
-<>
-    <meta charset="UTF-8">
+<head>
+<meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Klinik PT. Daelim Indonesia</title>
     
@@ -13,9 +17,7 @@
   <link rel="stylesheet" crossorigin href="../../assets/compiled/css/table-datatable.css">
   <link rel="stylesheet" crossorigin href="../../assets/compiled/css/app.css">
   <link rel="stylesheet" crossorigin href="../../assets/compiled/css/app-dark.css">
-
 </head>
-
 <body>
     <script src="../../assets/static/js/initTheme.js"></script>
     <div id="app">
@@ -24,7 +26,7 @@
     <div class="sidebar-header position-relative">
         <div class="d-flex justify-content-between align-items-center">
             <div class="logo">
-                <a href="../../index.html"><img src="../../assets/images/logo.PNG" alt="Logo" srcset=""></a>
+                <a href="../../"><img src="../../assets/images/logo.PNG" alt="Logo" srcset=""></a>
             </div>
             <div class="theme-toggle d-flex gap-2  align-items-center mt-2">
                 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true"
@@ -65,7 +67,7 @@
             
             <li
                 class="sidebar-item active ">
-                <a href="../../index.html" class='sidebar-link'>
+                <a href="../../" class='sidebar-link'>
                     <i class="bi bi-grid-fill"></i>
                     <span>Dashboard</span>
                 </a>
@@ -89,17 +91,17 @@
                 <ul class="submenu ">
                     
                     <li class="submenu-item  ">
-                        <a href="layout-default.html" class="submenu-link">Pemeriksaan Pasien</a>
+                        <a href="../berobat/riwayat_berobat.php" class="submenu-link">Pemeriksaan Pasien</a>
                         
                     </li>
                     
-                    <li class="submenu-item  ">
-                        <a href="layout-default.html" class="submenu-link">Riwayat Medis</a>
+                    <!-- <li class="submenu-item  ">
+                        <a href="pages/berobat/riwayat_berobat.php" class="submenu-link">Riwayat Medis</a>
                         
                     </li>
-                    
+                     -->
                     <li class="submenu-item  ">
-                        <a href="layout-default.html" class="submenu-link">Kecelakaan Kerja</a>
+                        <a href="riwayat_kecelakaan.php" class="submenu-link">Kecelakaan Kerja</a>
                         
                     </li>
                 </ul>
@@ -117,23 +119,14 @@
                 <ul class="submenu ">
                     
                     <li class="submenu-item  ">
-                        <a href="layout-default.html" class="submenu-link">Data Obat</a>
+                        <a href="../obat/master_obat.php" class="submenu-link">Data Obat</a>
                         
                     </li>
                     
                     <li class="submenu-item  ">
-                        <a href="layout-default.html" class="submenu-link">Resep Obat</a>
-                        
-                    </li>
-                    
-                    <li class="submenu-item  ">
-                        <a href="layout-default.html" class="submenu-link">Transaksi Obat</a>
-                        
-                    </li>
-                    
+                        <a href="../obat/laporan_transaksi_obat.php" class="submenu-link">Laporan Transaksi Obat</a>                     
+                    </li>              
                 </ul>
-                
-
             </li>
             
             <li
@@ -210,113 +203,111 @@
                     <i class="bi bi-justify fs-3"></i>
                 </a>
             </header>
-<!-- Tempat Isi Data -->
-<?php
-include('../../config/koneksi.php')
-?>
+            <!-- TEMPAT ISI DATA -->
 
-<div class="page-heading">
-    <h3>Tambah Data Karyawan</h3>
-</div>
-
-<div class="page-content">
-    <section class="section">
-        <div class="card">
-            <div class="card-header">
-                <h4 class="card-title">Formulir Pendaftaran Karyawan Baru</h4>
-            </div>
-            <div class="card-body">
-                <form method="POST" action="simpan_karyawan.php" class="form">
-                    <div class="row">
-                        
-                        <div class="col-md-6 col-12">
-                            <div class="form-group">
-                                <label for="id_card" class="form-label">ID Card <span class="text-danger">*</span></label>
-                                <input type="text" id="id_card" class="form-control" name="id_card" required placeholder="Contoh: FA00001">
-                            </div>
-                        </div>
-                        <div class="col-md-6 col-12">
-                            <div class="form-group">
-                                <label for="nama" class="form-label">Nama Lengkap <span class="text-danger">*</span></label>
-                                <input type="text" id="nama" class="form-control" name="nama" required placeholder="Masukkan nama lengkap karyawan">
-                            </div>
-                        </div>
-
-                        <div class="col-md-6 col-12">
-                            <div class="form-group">
-                                <label for="jabatan" class="form-label">Jabatan <span class="text-danger">*</span></label>
-                                <input type="text" id="jabatan" class="form-control" name="jabatan" required placeholder="Contoh: Operator / Ass. Manager">
-                            </div>
-                        </div>
-                        <div class="col-md-6 col-12">
-                            <div class="form-group">
-                                <label for="departemen" class="form-label">Departemen <span class="text-danger">*</span></label>
-                                <input type="text" id="departemen" class="form-control" name="departemen" required placeholder="Contoh: Maintenance / HRD">
-                            </div>
-                        </div>
-
-                        <div class="col-md-6 col-12">
-                            <div class="form-group">
-                                <label for="tgl_lahir" class="form-label">Tanggal Lahir</label>
-                                <input type="date" id="tgl_lahir" class="form-control" name="tgl_lahir">
-                            </div>
-                        </div>
-                        <div class="col-md-6 col-12">
-                            <div class="form-group">
-                                <label for="jenis_kelamin" class="form-label">Jenis Kelamin <span class="text-danger">*</span></label>
-                                <select id="jenis_kelamin" class="form-select" name="jenis_kelamin" required>
-                                    <option value="">Pilih Jenis Kelamin</option>
-                                    <option value="MAN">Laki-laki (L)</option>
-                                    <option value="FEMALE">Perempuan (P)</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div class="col-md-6 col-12">
-                            <div class="form-group">
-                                <label for="telepon" class="form-label">Telepon</label>
-                                <input type="tel" id="telepon" class="form-control" name="telepon" placeholder="Contoh: 0812xxxxxxxx">
-                            </div>
-                        </div>
-                        <div class="col-md-6 col-12">
-                            <div class="form-group">
-                                <label for="tgl_masuk" class="form-label">Tanggal Masuk <span class="text-danger">*</span></label>
-                                <input type="date" id="tgl_masuk" class="form-control" name="tgl_masuk" required>
-                            </div>
-                        </div>
-
-                        <div class="col-12">
-                            <div class="form-group">
-                                <label for="status" class="form-label">Status <span class="text-danger">*</span></label>
-                                <select id="status" class="form-select" name="status" required>
-                                    <option value="Aktif">Aktif</option>
-                                    <option value="Nonaktif">Nonaktif</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="col-12 d-flex justify-content-end mt-3">
-                            <button type="submit" class="btn btn-primary me-1 mb-1" name="simpan">
-                                <i class="bi bi-save me-2"></i>Simpan Data
-                            </button>
-                            <a href="karyawan.php" class="btn btn-light-secondary me-1 mb-1">Batal/Kembali</a>
-                        </div>
-                    </div>
-                </form>
-                </div>
+            
+        <div class="page-heading">
+            <h3>Tambah Data Karyawan</h3>
         </div>
-    </section>
-</div>
 
-<!-- Tempat Isi Data -->
+        <div class="page-content">
+            <section class="section">
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="card-title">Formulir Pendaftaran Karyawan Baru</h4>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="simpan_karyawan.php" class="form">
+                            <div class="row">
+                                
+                                <div class="col-md-6 col-12">
+                                    <div class="form-group">
+                                        <label for="id_card" class="form-label">ID Card <span class="text-danger">*</span></label>
+                                        <input type="text" id="id_card" class="form-control" name="id_card" required placeholder="Contoh: FA00001">
+                                    </div>
+                                </div>
+                                <div class="col-md-6 col-12">
+                                    <div class="form-group">
+                                        <label for="nama" class="form-label">Nama Lengkap <span class="text-danger">*</span></label>
+                                        <input type="text" id="nama" class="form-control" name="nama" required placeholder="Masukkan nama lengkap karyawan">
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6 col-12">
+                                    <div class="form-group">
+                                        <label for="jabatan" class="form-label">Jabatan <span class="text-danger">*</span></label>
+                                        <input type="text" id="jabatan" class="form-control" name="jabatan" required placeholder="Contoh: Operator / Ass. Manager">
+                                    </div>
+                                </div>
+                                <div class="col-md-6 col-12">
+                                    <div class="form-group">
+                                        <label for="departemen" class="form-label">Departemen <span class="text-danger">*</span></label>
+                                        <input type="text" id="departemen" class="form-control" name="departemen" required placeholder="Contoh: Maintenance / HRD">
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6 col-12">
+                                    <div class="form-group">
+                                        <label for="tgl_lahir" class="form-label">Tanggal Lahir</label>
+                                        <input type="date" id="tgl_lahir" class="form-control" name="tgl_lahir">
+                                    </div>
+                                </div>
+                                <div class="col-md-6 col-12">
+                                    <div class="form-group">
+                                        <label for="jenis_kelamin" class="form-label">Jenis Kelamin <span class="text-danger">*</span></label>
+                                        <select id="jenis_kelamin" class="form-select" name="jenis_kelamin" required>
+                                            <option value="">Pilih Jenis Kelamin</option>
+                                            <option value="MAN">Laki-laki (L)</option>
+                                            <option value="FEMALE">Perempuan (P)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6 col-12">
+                                    <div class="form-group">
+                                        <label for="telepon" class="form-label">Telepon</label>
+                                        <input type="tel" id="telepon" class="form-control" name="telepon" placeholder="Contoh: 0812xxxxxxxx">
+                                    </div>
+                                </div>
+                                <div class="col-md-6 col-12">
+                                    <div class="form-group">
+                                        <label for="tgl_masuk" class="form-label">Tanggal Masuk <span class="text-danger">*</span></label>
+                                        <input type="date" id="tgl_masuk" class="form-control" name="tgl_masuk" required>
+                                    </div>
+                                </div>
+
+                                <div class="col-12">
+                                    <div class="form-group">
+                                        <label for="status" class="form-label">Status <span class="text-danger">*</span></label>
+                                        <select id="status" class="form-select" name="status" required>
+                                            <option value="Aktif">Aktif</option>
+                                            <option value="Nonaktif">Nonaktif</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="col-12 d-flex justify-content-end mt-3">
+                                    <button type="submit" class="btn btn-primary me-1 mb-1" name="simpan">
+                                        <i class="bi bi-save me-2"></i>Simpan Data
+                                    </button>
+                                    <a href="karyawan.php" class="btn btn-light-secondary me-1 mb-1">Batal/Kembali</a>
+                                </div>
+                            </div>
+                        </form>
+                        </div>
+                </div>
+            </section>
+        </div>
+
+            <!-- TEMPAT ISI DATA -->
             <footer>
     <div class="footer clearfix mb-0 text-muted">
         <div class="float-start">
-            <p>2023 &copy; Mazer</p>
+            <p>2025 &copy; Daelim</p>
         </div>
         <div class="float-end">
             <p>Crafted with <span class="text-danger"><i class="bi bi-heart-fill icon-mid"></i></span>
-                by <a href="https://saugi.me">IT PT. Daelim Indonesia</a></p>
+                by <a href="https://daelim.id">IT PT. Daelim Indonesia</a></p>
         </div>
     </div>
 </footer>
@@ -333,5 +324,7 @@ include('../../config/koneksi.php')
 <!-- Need: Apexcharts -->
 <script src="../../assets/extensions/apexcharts/apexcharts.min.js"></script>
 <script src="../../assets/static/js/pages/dashboard.js"></script>
-<script src="../../assets/compiled/js/app.js"></script>
+
 </body>
+
+</html>

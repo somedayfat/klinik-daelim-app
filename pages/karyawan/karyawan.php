@@ -1,3 +1,33 @@
+<?php
+                include('../../config/koneksi.php');
+                
+                if (isset($_GET['status'])) {
+                    $status = $_GET['status'];
+                    $pesan = '';
+                    $class = '';
+
+                    if ($status == 'tambah_sukses') {
+                        $pesan = 'Data karyawan berhasil ditambahkan! ✅';
+                        $class = 'alert-success';
+                    } elseif ($status == 'edit_sukses') {
+                        $pesan = 'Data karyawan berhasil diperbarui! 📝';
+                        $class = 'alert-success';
+                    } elseif ($status == 'hapus_sukses') {
+                        $pesan = 'Data karyawan berhasil dihapus! 🗑️';
+                        $class = 'alert-success';
+                    } elseif ($status == 'hapus_gagal') {
+                        $pesan = 'Data karyawan gagal dihapus. Silakan coba lagi. ❌';
+                        $class = 'alert-danger';
+                    }
+                    
+                    if ($pesan) {
+                        echo "<div class='alert $class alert-dismissible fade show' role='alert'>";
+                        echo $pesan;
+                        echo "<button type='button' class='btn-close' data-bs-dismiss='alert' aria-label='Close'></button>";
+                        echo "</div>";
+                    }
+                }
+                ?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -85,7 +115,6 @@
             background-color: rgba(67, 94, 190, 0.05);
         }
     </style>
-</head>
 
 <body>
     <script src="../../assets/static/js/initTheme.js"></script>
@@ -95,7 +124,7 @@
     <div class="sidebar-header position-relative">
         <div class="d-flex justify-content-between align-items-center">
             <div class="logo">
-                <a href="index.html"><img src="../../assets/images/logo.PNG" alt="Logo" srcset=""></a>
+                <a href="../../"><img src="../../assets/images/logo.PNG" alt="Logo" srcset=""></a>
             </div>
             <div class="theme-toggle d-flex gap-2  align-items-center mt-2">
                 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true"
@@ -136,7 +165,7 @@
             
             <li
                 class="sidebar-item active ">
-                <a href="../../index.html" class='sidebar-link'>
+                <a href="../../" class='sidebar-link'>
                     <i class="bi bi-grid-fill"></i>
                     <span>Dashboard</span>
                 </a>
@@ -160,17 +189,17 @@
                 <ul class="submenu ">
                     
                     <li class="submenu-item  ">
-                        <a href="layout-default.html" class="submenu-link">Pemeriksaan Pasien</a>
+                        <a href="../berobat/riwayat_berobat.php" class="submenu-link">Pemeriksaan Pasien</a>
                         
                     </li>
                     
-                    <li class="submenu-item  ">
-                        <a href="layout-default.html" class="submenu-link">Riwayat Medis</a>
+                    <!-- <li class="submenu-item  ">
+                        <a href="pages/berobat/riwayat_berobat.php" class="submenu-link">Riwayat Medis</a>
                         
                     </li>
-                    
+                     -->
                     <li class="submenu-item  ">
-                        <a href="layout-default.html" class="submenu-link">Kecelakaan Kerja</a>
+                        <a href="../karyawan/riwayat_kecelakaan.php" class="submenu-link">Kecelakaan Kerja</a>
                         
                     </li>
                 </ul>
@@ -188,23 +217,14 @@
                 <ul class="submenu ">
                     
                     <li class="submenu-item  ">
-                        <a href="layout-default.html" class="submenu-link">Data Obat</a>
+                        <a href="../obat/master_obat.php" class="submenu-link">Data Obat</a>
                         
                     </li>
                     
                     <li class="submenu-item  ">
-                        <a href="layout-default.html" class="submenu-link">Resep Obat</a>
-                        
-                    </li>
-                    
-                    <li class="submenu-item  ">
-                        <a href="layout-default.html" class="submenu-link">Transaksi Obat</a>
-                        
-                    </li>
-                    
+                        <a href="../obat/laporan_transaksi_obat.php" class="submenu-link">Laporan Transaksi Obat</a>                     
+                    </li>              
                 </ul>
-                
-
             </li>
             
             <li
@@ -265,10 +285,13 @@
                         
                     </li>
                     
-                </ul>                
+                </ul>
+                
 
             </li>
-                    </ul>
+            
+            
+        </ul>
     </div>
 </div>
         </div>
@@ -278,39 +301,9 @@
                     <i class="bi bi-justify fs-3"></i>
                 </a>
             </header>
-<!-- Tempat Isi Data -->
-  <div class="page-content">
-                <?php
-                include('../../config/koneksi.php');
-                
-                if (isset($_GET['status'])) {
-                    $status = $_GET['status'];
-                    $pesan = '';
-                    $class = '';
+            <!-- TEMPAT ISI DATA -->
 
-                    if ($status == 'tambah_sukses') {
-                        $pesan = 'Data karyawan berhasil ditambahkan! ✅';
-                        $class = 'alert-success';
-                    } elseif ($status == 'edit_sukses') {
-                        $pesan = 'Data karyawan berhasil diperbarui! 📝';
-                        $class = 'alert-success';
-                    } elseif ($status == 'hapus_sukses') {
-                        $pesan = 'Data karyawan berhasil dihapus! 🗑️';
-                        $class = 'alert-success';
-                    } elseif ($status == 'hapus_gagal') {
-                        $pesan = 'Data karyawan gagal dihapus. Silakan coba lagi. ❌';
-                        $class = 'alert-danger';
-                    }
-                    
-                    if ($pesan) {
-                        echo "<div class='alert $class alert-dismissible fade show' role='alert'>";
-                        echo $pesan;
-                        echo "<button type='button' class='btn-close' data-bs-dismiss='alert' aria-label='Close'></button>";
-                        echo "</div>";
-                    }
-                }
-                ?>
- <div class="page-heading">
+            <div class="page-heading">
                     <div class="page-title">
                         <div class="row">
                             <div class="col-12 col-md-6 order-md-1 order-last">
@@ -426,22 +419,20 @@
                 </div>
             </div>
 
-<!-- Tempat Isi Data --> 
- 
+            <!-- TEMPAT ISI DATA -->
             <footer>
     <div class="footer clearfix mb-0 text-muted">
         <div class="float-start">
-            <p>2023 &copy; Mazer</p>
+            <p>2025 &copy; Daelim</p>
         </div>
         <div class="float-end">
             <p>Crafted with <span class="text-danger"><i class="bi bi-heart-fill icon-mid"></i></span>
-                by <a href="https://saugi.me">IT PT. Daelim Indonesia</a></p>
+                by <a href="https://daelim.id">IT PT. Daelim Indonesia</a></p>
         </div>
     </div>
 </footer>
         </div>
     </div>
-
     <script src="../../assets/static/js/components/dark.js"></script>
     <script src="../../assets/extensions/perfect-scrollbar/perfect-scrollbar.min.js"></script>
     
@@ -451,9 +442,8 @@
 
     
 <!-- Need: Apexcharts -->
-
-<script src="../../assets/extensions/simple-datatables/umd/simple-datatables.js"></script>
-<script src="../../assets/static/js/pages/simple-datatables.js"></script>
+<script src="../../assets/extensions/apexcharts/apexcharts.min.js"></script>
+<script src="../../assets/static/js/pages/dashboard.js"></script>
 
 </body>
 
