@@ -22,7 +22,7 @@ function postValue($key, $default = '') {
 }
 
 // Data pilihan statis 
-$jenis_kecelakaan_options = ['Terpotong', 'Tertusuk', 'Terjatuh', 'Terkilir', 'Lain-lain'];
+$jenis_kecelakaan_options = ['Terpotong', 'Tertusuk', 'Terjatuh', 'Tersayat', 'Terjepit', 'Lain-lain'];
 $status_options = ['Selesai Dirawat', 'Istirahat Mandiri', 'Rujuk Rumah Sakit', 'Rawat Inap Internal'];
 
 // --- LOGIKA UTAMA: PENYIMPANAN DATA KECELAKAAN KERJA ---
