@@ -1,6 +1,5 @@
 <?php
-// File: pages/berobat/form_pemeriksaan.php
-// Versi Lengkap & Diperbaiki: Mirip notepad.php + detail_pemeriksaan.php, Fix semua error, Full Edit Mode
+// File: form_pemeriksaan.php (FINAL & STABIL)
 
 session_start();
 include('../../config/koneksi.php'); 
@@ -9,680 +8,885 @@ date_default_timezone_set('Asia/Jakarta');
 
 $error = '';
 $success = '';
-$data_pemeriksaan = null;
-$data_resep = [];
-$data_karyawan = null;
-$riwayat_medis = null;
+$data_pemeriksaan_edit = null;
+$data_resep_edit = [];       
+$data_karyawan = null;    
+$riwayat_medis = null;    
 $is_edit_mode = false;
 $id_berobat_edit = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-$petugas = "Aditya Fajrin"; // Ganti dengan $_SESSION['user_nama'] jika ada
+$id_card_cari = ''; 
+$petugas = "Aditya Fajrin"; 
 
-// Helper untuk nilai form
-function postValue($key, $default = '', $db_data = null) {
-    if (isset($_POST[$key])) return htmlspecialchars($_POST[$key]);
-    if ($db_data && isset($db_data[$key])) return htmlspecialchars($db_data[$key]);
+// Helper untuk mengisi form
+function postValue($key, $edit_data = null, $default = '') {
+    if (isset($_POST[$key])) {
+        return htmlspecialchars($_POST[$key]);
+    }
+    if ($edit_data && isset($edit_data[$key])) {
+        return htmlspecialchars($edit_data[$key]);
+    }
     return htmlspecialchars($default);
 }
 
-// --- MODE EDIT: Prepared Statements ---
-if ($id_berobat_edit > 0) {
+// --- LOGIKA DETEKSI MODE EDIT ---
+if ($id_berobat_edit > 0 && !isset($_POST['simpan_pemeriksaan'])) {
     $is_edit_mode = true;
-
-    $query_utama = "SELECT 
+    
+    // 1. Ambil data pemeriksaan utama DAN data karyawan
+    $q_pemeriksaan = "SELECT 
                         b.*, 
                         k.nama AS nama_karyawan,
                         k.jabatan,
                         k.departemen
-                    FROM berobat b
-                    JOIN karyawan k ON b.id_card = k.id_card
-                    WHERE b.id = ?";
+                      FROM berobat b
+                      JOIN karyawan k ON b.id_card = k.id_card
+                      WHERE b.id = '$id_berobat_edit'";
     
-    if ($stmt = mysqli_prepare($koneksi, $query_utama)) {
-        mysqli_stmt_bind_param($stmt, "i", $id_berobat_edit);
-        mysqli_stmt_execute($stmt);
-        $result_utama = mysqli_stmt_get_result($stmt);
+    $r_pemeriksaan = mysqli_query($koneksi, $q_pemeriksaan);
+    
+    if ($r_pemeriksaan && mysqli_num_rows($r_pemeriksaan) > 0) {
+        $data_pemeriksaan_edit = mysqli_fetch_assoc($r_pemeriksaan);
+        $id_card_cari = $data_pemeriksaan_edit['id_card']; 
         
-        if ($result_utama && mysqli_num_rows($result_utama) > 0) {
-            $data_pemeriksaan = mysqli_fetch_assoc($result_utama);
+        // Simpan data karyawan untuk pre-fill tampilan
+        $data_karyawan = [
+            'id_card' => $data_pemeriksaan_edit['id_card'],
+            'nama' => $data_pemeriksaan_edit['nama_karyawan'],
+            'jabatan' => $data_pemeriksaan_edit['jabatan'],
+            'departemen' => $data_pemeriksaan_edit['departemen']
+        ];
 
-            $data_karyawan = [
-                'id_card' => $data_pemeriksaan['id_card'],
-                'nama' => $data_pemeriksaan['nama_karyawan'],
-                'jabatan' => $data_pemeriksaan['jabatan'],
-                'departemen' => $data_pemeriksaan['departemen']
-            ];
-
-            // Resep Obat
-            $query_resep = "SELECT rd.obat_id, rd.jumlah, o.nama_obat, o.satuan, o.stok_tersedia
-                            FROM resep_obat rd
-                            JOIN obat o ON rd.obat_id = o.id
-                            WHERE rd.berobat_id = ?";
-            if ($stmt_resep = mysqli_prepare($koneksi, $query_resep)) {
-                mysqli_stmt_bind_param($stmt_resep, "i", $id_berobat_edit);
-                mysqli_stmt_execute($stmt_resep);
-                $result_resep = mysqli_stmt_get_result($stmt_resep);
-                while ($row = mysqli_fetch_assoc($result_resep)) {
-                    $data_resep[] = $row;
-                }
+        // 2. Ambil data resep obat lama
+        $q_resep = "SELECT r.*, o.nama_obat, o.satuan, o.stok_tersedia FROM resep_obat r 
+                    JOIN obat o ON r.id_obat = o.id 
+                    WHERE r.id_berobat = '$id_berobat_edit'";
+        $r_resep = mysqli_query($koneksi, $q_resep);
+        if ($r_resep) {
+            while ($row_resep = mysqli_fetch_assoc($r_resep)) {
+                $data_resep_edit[] = $row_resep;
             }
-
-            // Riwayat Medis
-            $query_rm = "SELECT * FROM riwayat_medis WHERE id_card = ?";
-            if ($stmt_rm = mysqli_prepare($koneksi, $query_rm)) {
-                mysqli_stmt_bind_param($stmt_rm, "s", $data_pemeriksaan['id_card']);
-                mysqli_stmt_execute($stmt_rm);
-                $result_rm = mysqli_stmt_get_result($stmt_rm);
-                if (mysqli_num_rows($result_rm) > 0) {
-                    $riwayat_medis = mysqli_fetch_assoc($result_rm);
-                }
-            }
-        } else {
-            $error = "Data pemeriksaan tidak ditemukan.";
-            $is_edit_mode = false;
         }
     } else {
-        $error = "Query error: " . mysqli_error($koneksi);
+        $error = "Data pemeriksaan (ID: $id_berobat_edit) tidak ditemukan.";
+        $is_edit_mode = false; 
     }
 }
 
-// --- SIMPAN (INSERT/UPDATE) TRANSAKSI ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['simpan_pemeriksaan'])) {
+
+// --- LOGIKA UTAMA: PENYIMPANAN TRANSAKSIONAL (SAMA DENGAN SEBELUMNYA) ---
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['simpan_pemeriksaan'])) {
+    
+    $is_update = isset($_POST['id_berobat_edit']) && (int)$_POST['id_berobat_edit'] > 0;
+    $id_berobat_post = (int)$_POST['id_berobat_edit'];
+    
     $id_card = mysqli_real_escape_string($koneksi, $_POST['id_card']);
-    $is_update = !empty($_POST['is_update']);
-    $id_berobat_post = $is_update ? (int)$_POST['id_berobat_post'] : 0;
-
-    // Validasi karyawan
-    $check_q = "SELECT id_card FROM karyawan WHERE id_card = ?";
-    if ($stmt_check = mysqli_prepare($koneksi, $check_q)) {
-        mysqli_stmt_bind_param($stmt_check, "s", $id_card);
-        mysqli_stmt_execute($stmt_check);
-        $check_result = mysqli_stmt_get_result($stmt_check);
-        if (mysqli_num_rows($check_result) == 0) {
-            $error = "ID Card karyawan tidak valid.";
-        }
-    }
-
-    if (empty($error)) {
+    
+    // Validasi Karyawan
+    $q_check = "SELECT k.nama FROM karyawan k WHERE k.id_card = '$id_card'";
+    $r_check = mysqli_query($koneksi, $q_check);
+    if (!$r_check || mysqli_num_rows($r_check) == 0) {
+        $error = "Gagal menyimpan. ID Card tidak valid atau tidak ditemukan.";
+    } else {
+        // Ambil data form
         $keluhan = mysqli_real_escape_string($koneksi, $_POST['keluhan']);
         $diagnosis = mysqli_real_escape_string($koneksi, $_POST['diagnosis']);
+        $tindakan = mysqli_real_escape_string($koneksi, $_POST['tindakan']);
         $tekanan_darah = mysqli_real_escape_string($koneksi, $_POST['tekanan_darah']);
         $suhu_tubuh = mysqli_real_escape_string($koneksi, $_POST['suhu_tubuh']);
-        $nadi = mysqli_real_escape_string($koneksi, $_POST['nadi']);
-        $pernafasan = mysqli_real_escape_string($koneksi, $_POST['pernafasan']);
-        $tindakan = mysqli_real_escape_string($koneksi, $_POST['tindakan']);
         $rujukan = mysqli_real_escape_string($koneksi, $_POST['rujukan']);
         $catatan = mysqli_real_escape_string($koneksi, $_POST['catatan']);
-        $tanggal = date('Y-m-d H:i:s');
+        $tanggal_berobat = date('Y-m-d H:i:s');
+        $petugas_input = mysqli_real_escape_string($koneksi, $petugas);
 
         $obat_ids = $_POST['obat_id'] ?? [];
-        $jumlahs = $_POST['jumlah'] ?? [];
-        $validated = [];
-        $stok_updates = [];
-
-        foreach ($obat_ids as $i => $obat_id) {
-            if (empty($obat_id) || empty($jumlahs[$i])) continue;
-            $obat_id = (int)$obat_id;
-            $jumlah = (int)$jumlahs[$i];
-
-            $q_obat = "SELECT stok_tersedia, nama_obat, satuan FROM obat WHERE id = ?";
-            if ($stmt_obat = mysqli_prepare($koneksi, $q_obat)) {
-                mysqli_stmt_bind_param($stmt_obat, "i", $obat_id);
-                mysqli_stmt_execute($stmt_obat);
-                $res_obat = mysqli_stmt_get_result($stmt_obat);
-                if ($row_obat = mysqli_fetch_assoc($res_obat)) {
-                    if ($is_update) {
-                        $q_old = "SELECT jumlah FROM resep_obat WHERE berobat_id = ? AND obat_id = ?";
-                        if ($stmt_old = mysqli_prepare($koneksi, $q_old)) {
-                            mysqli_stmt_bind_param($stmt_old, "ii", $id_berobat_post, $obat_id);
-                            mysqli_stmt_execute($stmt_old);
-                            $res_old = mysqli_stmt_get_result($stmt_old);
-                            $old_row = mysqli_fetch_assoc($res_old);
-                            $old_jumlah = $old_row['jumlah'] ?? 0;
-                            $available = $row_obat['stok_tersedia'] + $old_jumlah;
-                            $delta = $jumlah - $old_jumlah;
-                        }
-                    } else {
-                        $available = $row_obat['stok_tersedia'];
-                        $delta = $jumlah;
-                    }
-
-                    if ($jumlah > $available) {
-                        $error = "Stok {$row_obat['nama_obat']} tidak cukup (max: $available {$row_obat['satuan']}).";
-                        break;
-                    }
-
-                    $validated[] = ['obat_id' => $obat_id, 'jumlah' => $jumlah];
-                    $stok_updates[$obat_id] = -$delta;
-                }
-            }
+        $jumlah_keluar = $_POST['jumlah_keluar'] ?? [];
+        
+        if (empty($id_card) || empty($keluhan) || empty($diagnosis) || empty($tekanan_darah)) {
+            $error = "Data pasien, keluhan, diagnosis, dan tekanan darah wajib diisi.";
         }
 
         if (empty($error)) {
             mysqli_begin_transaction($koneksi);
             try {
+                $id_berobat_affected = 0;
+                
                 if ($is_update) {
-                    $q_update = "UPDATE berobat SET 
-                                 keluhan = ?, diagnosis = ?, tekanan_darah = ?, suhu_tubuh = ?, 
-                                 nadi = ?, pernafasan = ?, tindakan = ?, rujukan = ?, 
-                                 catatan = ?, petugas = ?, tanggal_berobat = ? 
-                                 WHERE id = ?";
-                    if ($stmt_up = mysqli_prepare($koneksi, $q_update)) {
-                        mysqli_stmt_bind_param($stmt_up, "sssssssssssi", $keluhan, $diagnosis, $tekanan_darah, $suhu_tubuh, 
-                                               $nadi, $pernafasan, $tindakan, $rujukan, $catatan, $petugas, $tanggal, $id_berobat_post);
-                        mysqli_stmt_execute($stmt_up);
+                    $id_berobat_affected = $id_berobat_post;
+                    
+                    // Rollback & Hapus Resep Lama
+                    $q_resep_lama = "SELECT id_obat, jumlah FROM resep_obat WHERE id_berobat = '$id_berobat_affected'";
+                    $r_resep_lama = mysqli_query($koneksi, $q_resep_lama);
+                    while ($obat_lama = mysqli_fetch_assoc($r_resep_lama)) {
+                        mysqli_query($koneksi, "UPDATE obat SET stok_tersedia = stok_tersedia + " . (int)$obat_lama['jumlah'] . " WHERE id = '{$obat_lama['id_obat']}'");
+                    }
+                    mysqli_query($koneksi, "DELETE FROM resep_obat WHERE id_berobat = '$id_berobat_affected'");
+                    mysqli_query($koneksi, "DELETE FROM transaksi_obat WHERE id_berobat = '$id_berobat_affected' AND tipe_transaksi = 'Keluar'");
+                    
+                    // Update Data Pemeriksaan Utama
+                    $q_berobat_update = "UPDATE berobat SET 
+                        keluhan = '$keluhan', diagnosis = '$diagnosis', tindakan = '$tindakan', 
+                        tekanan_darah = '$tekanan_darah', suhu_tubuh = '$suhu_tubuh', 
+                        rujukan = '$rujukan', catatan = '$catatan', petugas = '$petugas_input',
+                        tanggal_berobat = '$tanggal_berobat'
+                    WHERE id = '$id_berobat_affected'";
+                    
+                    if (!mysqli_query($koneksi, $q_berobat_update)) {
+                        throw new Exception("Gagal memperbarui data pemeriksaan: " . mysqli_error($koneksi));
                     }
 
-                    mysqli_query($koneksi, "DELETE FROM resep_obat WHERE berobat_id = $id_berobat_post");
-                    $berobat_id = $id_berobat_post;
                 } else {
-                    $q_insert = "INSERT INTO berobat 
-                                 (id_card, tanggal_berobat, keluhan, diagnosis, tekanan_darah, suhu_tubuh, 
-                                  nadi, pernafasan, tindakan, rujukan, catatan, petugas, created_at) 
-                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
-                    if ($stmt_ins = mysqli_prepare($koneksi, $q_insert)) {
-                        mysqli_stmt_bind_param($stmt_ins, "ssssssssssss", $id_card, $tanggal, $keluhan, $diagnosis, 
-                                               $tekanan_darah, $suhu_tubuh, $nadi, $pernafasan, $tindakan, $rujukan, $catatan, $petugas);
-                        mysqli_stmt_execute($stmt_ins);
+                    // INSERT BARU
+                    $q_berobat_insert = "INSERT INTO berobat (
+                        id_card, tanggal_berobat, keluhan, diagnosis, tindakan, 
+                        tekanan_darah, suhu_tubuh, rujukan, catatan, petugas
+                    ) VALUES (
+                        '$id_card', '$tanggal_berobat', '$keluhan', '$diagnosis', '$tindakan', 
+                        '$tekanan_darah', '$suhu_tubuh', '$rujukan', '$catatan', '$petugas_input'
+                    )";
+                    
+                    if (!mysqli_query($koneksi, $q_berobat_insert)) {
+                        throw new Exception("Gagal menyimpan data pemeriksaan: " . mysqli_error($koneksi));
                     }
-                    $berobat_id = mysqli_insert_id($koneksi);
+                    $id_berobat_affected = mysqli_insert_id($koneksi);
                 }
 
-                foreach ($validated as $v) {
-                    $q_resep = "INSERT INTO resep_obat (berobat_id, obat_id, jumlah, created_at) 
-                                VALUES (?, ?, ?, NOW())";
-                    if ($stmt_resep = mysqli_prepare($koneksi, $q_resep)) {
-                        mysqli_stmt_bind_param($stmt_resep, "iii", $berobat_id, $v['obat_id'], $v['jumlah']);
-                        mysqli_stmt_execute($stmt_resep);
-                    }
-                }
+                // LOGIKA RESEP OBAT
+                if (!empty($obat_ids)) {
+                    foreach ($obat_ids as $index => $obat_id) {
+                        $id_obat = mysqli_real_escape_string($koneksi, $obat_id);
+                        $jml_keluar = (int)$jumlah_keluar[$index];
+                        
+                        if ($jml_keluar > 0 && !empty($id_obat)) {
+                            
+                            $q_check_stok = "SELECT stok_tersedia, nama_obat FROM obat WHERE id = '$id_obat'";
+                            $r_check_stok = mysqli_query($koneksi, $q_check_stok);
+                            $data_obat = mysqli_fetch_assoc($r_check_stok);
 
-                foreach ($stok_updates as $oid => $delta) {
-                    $q_stok = "UPDATE obat SET stok_tersedia = stok_tersedia + ? WHERE id = ?";
-                    if ($stmt_stok = mysqli_prepare($koneksi, $q_stok)) {
-                        mysqli_stmt_bind_param($stmt_stok, "ii", $delta, $oid);
-                        mysqli_stmt_execute($stmt_stok);
+                            if (!$data_obat || $jml_keluar > $data_obat['stok_tersedia']) {
+                                throw new Exception("Stok obat **" . htmlspecialchars($data_obat['nama_obat'] ?? 'ID ' . $id_obat) . "** tidak mencukupi.");
+                            }
+                            
+                            $stok_sebelum = $data_obat['stok_tersedia'];
+                            $stok_sesudah = $stok_sebelum - $jml_keluar;
+                            $keterangan_obat = "Resep pemeriksaan (ID: $id_berobat_affected)";
+
+                            // Update Stok, Catat Transaksi, Catat Resep
+                            mysqli_query($koneksi, "UPDATE obat SET stok_tersedia = $stok_sesudah WHERE id = '$id_obat'");
+                            mysqli_query($koneksi, "INSERT INTO transaksi_obat (id_obat, tanggal_transaksi, tipe_transaksi, jumlah, stok_sebelum, stok_sesudah, keterangan, id_berobat, petugas) VALUES ('$id_obat', '$tanggal_berobat', 'Keluar', '$jml_keluar', '$stok_sebelum', '$stok_sesudah', '$keterangan_obat', '$id_berobat_affected', '$petugas_input')");
+                            mysqli_query($koneksi, "INSERT INTO resep_obat (id_berobat, id_obat, jumlah) VALUES ('$id_berobat_affected', '$id_obat', '$jml_keluar')");
+                        }
                     }
                 }
 
                 mysqli_commit($koneksi);
-                $success = $is_update ? "Pemeriksaan berhasil diupdate." : "Pemeriksaan baru berhasil disimpan.";
-                // Refresh data untuk mode edit setelah update
+                
                 if ($is_update) {
-                    header("Location: form_pemeriksaan.php?id=$berobat_id&success=1");
-                    exit;
+                    header("Location: form_pemeriksaan.php?id=$id_berobat_affected&status=update_sukses");
+                    exit();
+                } else {
+                    header("Location: detail_pemeriksaan.php?id=$id_berobat_affected&status=tambah_sukses");
+                    exit();
                 }
+
             } catch (Exception $e) {
                 mysqli_rollback($koneksi);
-                $error = "Gagal simpan: " . $e->getMessage();
+                $error = "Terjadi Kesalahan Transaksi: " . $e->getMessage() . " ❌";
+                $id_card_cari = $id_card;
+                if ($is_update) {
+                    $is_edit_mode = true;
+                    $id_berobat_edit = $id_berobat_post;
+                }
             }
         }
     }
 }
+
+// --- Logika untuk mengisi ulang data Karyawan & Riwayat Medis ---
+if ($error && isset($_POST['id_card'])) {
+    $id_card_cari = mysqli_real_escape_string($koneksi, $_POST['id_card']);
+}
+
+// Ambil data karyawan dan riwayat medis jika ID Card sudah diketahui (baik dari edit mode atau post gagal)
+if (!empty($id_card_cari)) {
+    // Ambil detail karyawan
+    $q_karyawan = "SELECT id_card, nama, jabatan, departemen FROM karyawan WHERE id_card = '$id_card_cari'";
+    $r_karyawan = mysqli_query($koneksi, $q_karyawan);
+    if ($r_karyawan && mysqli_num_rows($r_karyawan) > 0) {
+        $karyawan_from_db = mysqli_fetch_assoc($r_karyawan);
+        if (!$data_karyawan) {
+            $data_karyawan = $karyawan_from_db;
+        }
+    }
+
+    // Ambil riwayat medis
+    $q_riwayat = "SELECT penyakit_terdahulu, alergi, golongan_darah FROM riwayat_medis WHERE id_card = '$id_card_cari'";
+    $r_riwayat = mysqli_query($koneksi, $q_riwayat);
+    if ($r_riwayat && mysqli_num_rows($r_riwayat) > 0) {
+        $riwayat_medis = mysqli_fetch_assoc($r_riwayat);
+    } else {
+        $riwayat_medis = ['penyakit_terdahulu' => 'TIDAK ADA', 'alergi' => 'TIDAK ADA', 'golongan_darah' => 'TIDAK DIKETAHUI'];
+    }
+} else {
+    $riwayat_medis = ['penyakit_terdahulu' => 'TIDAK ADA', 'alergi' => 'TIDAK ADA', 'golongan_darah' => 'TIDAK DIKETAHUI'];
+}
+
+// Tentukan data resep yang akan di-load (Edit > Post Gagal > Kosong)
+$resep_to_load = [];
+if ($error && isset($_POST['obat_id'])) {
+    foreach ($_POST['obat_id'] as $index => $obat_id_post) {
+        if (!empty($obat_id_post)) {
+            // Kita harus mengambil nama obat dari DB untuk pre-fill display input
+            $q_obat = "SELECT nama_obat, satuan, stok_tersedia FROM obat WHERE id = '" . mysqli_real_escape_string($koneksi, $obat_id_post) . "'";
+            $r_obat = mysqli_query($koneksi, $q_obat);
+            $data_obat = mysqli_fetch_assoc($r_obat);
+
+            $resep_to_load[] = [
+                'id_obat' => $obat_id_post, 
+                'jumlah' => $_POST['jumlah_keluar'][$index] ?? 0,
+                'nama_obat' => $data_obat['nama_obat'] ?? 'Obat Tidak Ditemukan',
+                'satuan' => $data_obat['satuan'] ?? 'Unit',
+                'stok_tersedia' => $data_obat['stok_tersedia'] ?? 0
+            ];
+        }
+    }
+} else if ($is_edit_mode) {
+    // Jika mode edit berhasil, $data_resep_edit sudah berisi nama_obat, satuan, stok_tersedia
+    $resep_to_load = $data_resep_edit;
+}
+
 ?>
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $is_edit_mode ? 'Edit' : 'Tambah'; ?> Pemeriksaan Pasien</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
-    
-    <link rel="shortcut icon" href="data:image/svg+xml,%3csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2033%2034'%20fill-rule='evenodd'%20stroke-linejoin='round'%20stroke-miterlimit='2'%20xmlns:v='https://vecta.io/nano'%3e%3cpath%20d='M3%2027.472c0%204.409%206.18%205.552%2013.5%205.552%207.281%200%2013.5-1.103%2013.5-5.513s-6.179-5.552-13.5-5.552c-7.281%200-13.5%201.103-13.5%205.513z'%20fill='%23435ebe'%20fill-rule='nonzero'/%3e%3ccircle%20cx='16.5'%20cy='8.8'%20r='8.8'%20fill='%2341bbdd'/%3e%3c/svg%3e" type="image/x-icon">
-    <link rel="shortcut icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACEAAAAiCAYAAADRcLDBAAAEs2lUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4KPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iWE1QIENvcmUgNS41LjAiPgogPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4KICA8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIgogICAgeG1sbnM6ZXhpZj0iaHR0cDovL25zLmFkb2JlLmNvbS9leGlmLzEuMC8iCiAgICB4bWxuczp0aWZmPSJodHRwOi8vbnMuYWRvYmUuY29tL3RpZmYvMS4wLyIKICAgIHhtbG5zOnBob3Rvc2hvcD0iaHR0cDovL25zLmFkb2JlLmNvbS9waG90b3Nob3AvMS4wLyIKICAgIHhtbG5zOnhtcD0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wLyIKICAgIHhtbG5zOnhtcE1NPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvbW0vIgogICAgeG1sbnM6c3RFdnQ9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZUV2ZW50IyIKICAgZXhpZjpQaXhlbFhEaW1lbnNpb249IjMzIgogICBleGlmOlBpeGVsWURpbWVuc2lvbj0iMzQiCiAgIGV4aWY6Q29sb3JTcGFjZT0iMSIKICAgdGlmZjpJbWFnZVdpZHRoPSIzMyIKICAgdGlmZjpJbWFnZUxlbmd0aD0iMzQiCiAgIHRpZmY6UmVzb2x1dGlvblVuaXQ9IjIiCiAgIHRpZmY6WFJlc29sdXRpb249Ijk2LjAiCiAgIHRpZmY6WVJlc29sdXRpb249Ijk2LjAiCiAgIHBob3Rvc2hvcDpDb2xvck1vZGU9IjMiCiAgIHBob3Rvc2hvcDpJQ0NQcm9maWxlPSJzUkdCIElFQzYxOTY2LTIuMSIKICAgeG1wOk1vZGlmeURhdGU9IjIwMjItMDMtMzFUMTA6NTA6MjMrMDI6MDAiCiAgIHhtcDpNZXRhZGF0YURhdGU9IjIwMjItMDMtMzFUMTA6NTA6MjMrMDI6MDAiPgogICA8eG1wTU06SGlzdG9yeT4KICAgIDxyZGY6U2VxPgogICAgIDxyZGY6bGkKICAgICAgc3RFdnQ6YWN0aW9uPSJwcm9kdWNlZCIKICAgICAgc3RFdnQ6c29mdHdhcmVBZ2VudD0iQWZmaW5pdHkgRGVzaWduZXIgMS4xMC4xIgogICAgICBzdEV2dDp3aGVuPSIyMDIyLTAzLTMxVDEwOjUwOjIzKzAyOjAwIi8+CiAgICA8L3JkZjpTZXE+CiAgIDwveG1wTU06SGlzdG9yeT4KICA8L3JkZjpEZXNjcmlwdGlvbj4KIDwvcmRmOlJERj4KPC94OnhtcG1ldGE+Cjw/eHBhY2tldCBlbmQ9InIiPz5V57uAAAABgmlDQ1BzUkdCIElFQzYxOTY2LTIuMQAAKJF1kc8rRFEUxz9maORHo1hYKC9hISNGTWwsRn4VFmOUX5uZZ36oeTOv954kW2WrKLHxa8FfwFZZK0WkZClrYoOe87ypmWTO7dzzud97z+nec8ETzaiaWd4NWtYyIiNhZWZ2TvE946WZSjqoj6mmPjE1HKWkfdxR5sSbgFOr9Ll/rXoxYapQVik8oOqGJTwqPL5i6Q5vCzeo6dii8KlwpyEXFL519LjLLw6nXP5y2IhGBsFTJ6ykijhexGra0ITl5bRqmWU1fx/nJTWJ7PSUxBbxJkwijBBGYYwhBgnRQ7/MIQIE6ZIVJfK7f/MnyUmuKrPOKgZLpEhj0SnqslRPSEyKnpCRYdXp/9++msneoFu9JgwVT7b91ga+LfjetO3PQ9v+PgLvI1xkC/m5A+h7F32zoLXug38dzi4LWnwHzjeg8UGPGbFfySvuSSbh9QRqZ6H+Gqrm3Z7l9zm+h+iafNUV7O5Bu5z3L/wAdthn7QIme0YAAAAJcEhZcwAADsQAAA7EAZUrDhsAAAJTSURBVFiF7Zi9axRBGIefEw2IdxFBRQsLWUTBaywSK4ubdSGVIY1Y6HZql8ZKCGIqwX/AYLmCgVQKfiDn7jZeEQMWfsSAHAiKqPiB5mIgELWYOW5vzc3O7niHhT/YZvY37/swM/vOzJbIqVq9uQ04CYwCI8AhYAlYAB4Dc7HnrOSJWcoJcBS4ARzQ2F4BZ2LPmTeNuykHwEWgkQGAet9QfiMZjUSt3hwD7psGTWgs9pwH1hC1enMYeA7sKwDxBqjGnvNdZzKZjqmCAKh+U1kmEwi3IEBbIsugnY5avTkEtIAtFhBrQCX2nLVehqyRqFoCAAwBh3WGLAhbgCRIYYinwLolwLqKUwwi9pxV4KUlxKKKUwxC6ZElRCPLYAJxGfhSEOCz6m8HEXvOB2CyIMSk6m8HoXQTmMkJcA2YNTHm3congOvATo3tE3A29pxbpnFzQSiQPcB55IFmFNgFfEQeahaAGZMpsIJIAZWAHcDX2HN+2cT6r39GxmvC9aPNwH5gO1BOPFuBVWAZue0vA9+A12EgjPadnhCuH1WAE8ivYAQ4ohKaagV4gvxi5oG7YSA2vApsCOH60WngKrA3R9IsvQUuhIGY00K4flQG7gHH/mLytB4C42EgfrQb0mV7us8AAMeBS8mGNMR4nwHamtBB7B4QRNdaS0M8GxDEog7iyoAguvJ0QYSBuAOcAt71Kfl7wA8DcTvZ2KtOlJEr+ByyQtqqhTyHTIeB+ONeqi3brh+VgIN0fohUgWGggizZFTplu12yW8iy/YLOGWMpDMTPXnl+Az9vj2HERYqPAAAAAElFTkSuQmCC" type="image/png">
-    
-    <link rel="stylesheet" href="../../assets/extensions/simple-datatables/style.css">
-    <link rel="stylesheet" crossorigin href="../../assets/compiled/css/table-datatable.css">
-    <link rel="stylesheet" crossorigin href="../../assets/compiled/css/app.css">
-    <link rel="stylesheet" crossorigin href="../../assets/compiled/css/app-dark.css">
-    
-    <!-- Select2 -->
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <title><?= $is_edit_mode ? 'Edit' : 'Form' ?> Pemeriksaan Medis | Klinik Daelim</title>
+    <link rel="shortcut icon" href="../../assets/static/images/logo/favicon.svg" type="image/x-icon">
+    <link rel="stylesheet" href="../../assets/compiled/css/app.css">
+    <link rel="stylesheet" href="../../assets/compiled/css/app-dark.css">
+    <link rel="stylesheet" href="../../assets/compiled/css/iconly.css">
     <style>
-        .stok-info { font-size: 0.85em; margin-top: 4px; }
-        .row-resep { border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px; }
-        @media print {
-            #sidebar, header, footer, .btn, .page-heading .btn { display: none !important; }
-            .card { border: none; box-shadow: none; }
+        .form-control[readonly] { 
+            background-color: #f8f9fa;
+            font-weight: 500;
+        }
+        
+        /* Desain Rapi dan Sectioned */
+        .section-header {
+            border-bottom: 2px solid #435ebe;
+            padding-bottom: 5px;
+            margin-bottom: 20px;
+        }
+        .resep-row {
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            background-color: #fcfcfc;
+        }
+        .info-box {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 5px solid #435ebe;
+            min-height: 200px;
+        }
+        .danger-box {
+            background-color: #fce4ec;
+            border-left: 5px solid #d32f2f;
+            min-height: 200px;
+        }
+        /* Style untuk hasil pencarian yang muncul di bawah input */
+        .search-result-box {
+            max-height: 200px;
+            overflow-y: auto;
+            position: absolute; /* Penting agar muncul di atas konten */
+            z-index: 10;
+            width: 95%; /* Sesuaikan dengan lebar input */
         }
     </style>
 </head>
 
 <body>
-    <script src="../../assets/static/js/initTheme.js"></script>
+    <script src="../../assets/static/js/components/dark.js"></script>
     <div id="app">
-        <div id="sidebar">
-            <div class="sidebar-wrapper active">
-                <div class="sidebar-header position-relative">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div class="logo">
-                            <a href="../../"><img src="../../assets/images/logo.PNG" alt="Logo" srcset=""></a>
-                        </div>
-                        <div class="theme-toggle d-flex gap-2 align-items-center mt-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--system-uicons" width="20" height="20" preserveAspectRatio="xMidYMid meet" viewBox="0 0 21 21">
-                                <g fill="none" fill-rule="evenodd" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M10.5 14.5c2.219 0 4-1.763 4-3.982a4.003 4.003 0 0 0-4-4.018c-2.219 0-4 1.781-4 4c0 2.219 1.781 4 4 4zM4.136 4.136L5.55 5.55m9.9 9.9l1.414 1.414M1.5 10.5h2m14 0h2M4.135 16.863L5.55 15.45m9.899-9.9l1.414-1.415M10.5 19.5v-2m0-14v-2" opacity=".3"></path>
-                                    <g transform="translate(-210 -1)">
-                                        <path d="M220.5 2.5v2m6.5.5l-1.5 1.5"></path>
-                                        <circle cx="220.5" cy="11.5" r="4"></circle>
-                                        <path d="m214 5l1.5 1.5m5 14v-2m6.5-.5l-1.5-1.5M214 18l1.5-1.5m-4-5h2m14 0h2"></path>
-                                    </g>
-                                </g>
-                            </svg>
-                            <div class="form-check form-switch fs-6">
-                                <input class="form-check-input me-0" type="checkbox" id="toggle-dark" style="cursor: pointer">
-                                <label class="form-check-label"></label>
+        <div id="main" class="layout-navbar navbar-fixed">
+            <div id="main-content">
+                <div class="page-heading">
+                    <div class="page-title">
+                        <div class="row">
+                            <div class="col-12 col-md-6 order-md-1 order-last">
+                                <h3><?= $is_edit_mode ? 'Edit Pemeriksaan (ID: '.$id_berobat_edit.')' : 'Pemeriksaan Pasien Baru' ?></h3>
+                                <p class="text-subtitle text-muted">Formulir untuk mencatat pemeriksaan dan resep obat.</p>
                             </div>
-                            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--mdi" width="20" height="20" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24">
-                                <path fill="currentColor" d="m17.75 4.09l-2.53 1.94l.91 3.06l-2.63-1.81l-2.63 1.81l.91-3.06l-2.53-1.94L12.44 4l1.06-3l1.06 3l3.19.09m3.5 6.91l-1.64 1.25l.59 1.98l-1.7-1.17l-1.7 1.17l.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95l2.06.05m-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85c-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14c.4-.4.82-.76 1.27-1.08c.75-.53 1.93.36 1.85 1.19c-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82c-2.81 3.14-2.7 7.96.31 10.98c3.02 3.01 7.84 3.12 10.98.31Z"></path>
-                            </svg>
-                        </div>
-                        <div class="sidebar-toggler x">
-                            <a href="#" class="sidebar-hide d-xl-none d-block"><i class="bi bi-x bi-middle"></i></a>
                         </div>
                     </div>
                 </div>
-                <div class="sidebar-menu">
-                    <ul class="menu">
-                        <li class="sidebar-title">Menu</li>
-                        <li class="sidebar-item active">
-                            <a href="../../" class='sidebar-link'>
-                                <i class="bi bi-grid-fill"></i>
-                                <span>Dashboard</span>
-                            </a>
-                        </li>
-                        <li class="sidebar-item">
-                            <a href="../karyawan/karyawan.php" class='sidebar-link'>
-                                <i class="bi bi-stack"></i>
-                                <span>Data Karyawan</span>
-                            </a>
-                        </li>
-                        <li class="sidebar-item has-sub">
-                            <a href="#" class='sidebar-link'>
-                                <i class="bi bi-collection-fill"></i>
-                                <span>Pelayanan Kesehatan</span>
-                            </a>
-                            <ul class="submenu">
-                                <li class="submenu-item">
-                                    <a href="riwayat_berobat.php" class="submenu-link">Pemeriksaan Pasien</a>
-                                </li>
-                                <li class="submenu-item">
-                                    <a href="../karyawan/form_kecelakaan_kerja.php" class="submenu-link">Kecelakaan Kerja</a>
-                                </li>
-                            </ul>
-                        </li>
-                        <li class="sidebar-item has-sub">
-                            <a href="#" class='sidebar-link'>
-                                <i class="bi bi-grid-1x2-fill"></i>
-                                <span>Manajemen Obat</span>
-                            </a>
-                            <ul class="submenu">
-                                <li class="submenu-item">
-                                    <a href="../obat/master_obat.php" class="submenu-link">Data Obat</a>
-                                </li>
-                                <li class="submenu-item">
-                                    <a href="../obat/laporan_transaksi_obat.php" class="submenu-link">Laporan Transaksi Obat</a>
-                                </li>
-                            </ul>
-                        </li>
-                        <li class="sidebar-item">
-                            <a href="#" class='sidebar-link'>
-                                <i class="bi bi-file-earmark-medical-fill"></i>
-                                <span>Laporan Klinik</span>
-                            </a>
-                        </li>
-                        <li class="sidebar-item has-sub">
-                            <a href="#" class='sidebar-link'>
-                                <i class="bi bi-person-circle"></i>
-                                <span>Account</span>
-                            </a>
-                            <ul class="submenu">
-                                <li class="submenu-item">
-                                    <a href="#" class="submenu-link">Profile</a>
-                                </li>
-                                <li class="submenu-item">
-                                    <a href="#" class="submenu-link">Security</a>
-                                </li>
-                            </ul>
-                        </li>
-                        <li class="sidebar-item has-sub">
-                            <a href="#" class='sidebar-link'>
-                                <i class="bi bi-person-badge-fill"></i>
-                                <span>Authentication</span>
-                            </a>
-                            <ul class="submenu">
-                                <li class="submenu-item">
-                                    <a href="#" class="submenu-link">Login</a>
-                                </li>
-                                <li class="submenu-item">
-                                    <a href="#" class="submenu-link">Register</a>
-                                </li>
-                                <li class="submenu-item">
-                                    <a href="#" class="submenu-link">Forgot Password</a>
-                                </li>
-                            </ul>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-        <div id="main">
-            <header class="mb-3">
-                <a href="#" class="burger-btn d-block d-xl-none">
-                    <i class="bi bi-justify fs-3"></i>
-                </a>
-            </header>
 
-            <div class="page-heading">
-                <div class="page-title">
-                    <div class="row">
-                        <div class="col-12 col-md-6 order-md-1 order-last">
-                            <h3><?php echo $is_edit_mode ? 'Edit' : 'Form'; ?> Pemeriksaan Pasien</h3>
-                            <p class="text-subtitle text-muted">Isi data pemeriksaan dengan lengkap.</p>
+                <section class="section">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h4 class="card-title text-white">Formulir Pemeriksaan</h4>
                         </div>
-                        <div class="col-12 col-md-6 order-md-2 order-first">
-                            <nav aria-label="breadcrumb" class="breadcrumb-header float-start float-lg-end">
-                                <ol class="breadcrumb">
-                                    <li class="breadcrumb-item"><a href="../../">Dashboard</a></li>
-                                    <li class="breadcrumb-item"><a href="riwayat_berobat.php">Riwayat</a></li>
-                                    <li class="breadcrumb-item active" aria-current="page"><?php echo $is_edit_mode ? 'Edit' : 'Tambah'; ?></li>
-                                </ol>
-                            </nav>
-                        </div>
-                    </div>
-                </div>
-            </div>
+                        <div class="card-body">
+                            
+                            <?php if ($error): ?>
+                                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                    <?= $error ?>
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            <?php endif; ?>
 
-            <?php if ($error): ?>
-                <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    <?php echo $error; ?>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            <?php endif; ?>
-            <?php if ($success || isset($_GET['success'])): ?>
-                <div class="alert alert-success alert-dismissible fade show" role="alert">
-                    <?php echo $success ?: "Operasi berhasil."; ?>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            <?php endif; ?>
+                            <?php if ($success || (isset($_GET['status']) && $_GET['status'] == 'update_sukses')): ?>
+                                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                                    Data berhasil disimpan!
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            <?php endif; ?>
 
-            <section class="section">
-                <div class="card">
-                    <div class="card-header">
-                        <h4 class="card-title"><?php echo $is_edit_mode ? 'Edit Data Pemeriksaan' : 'Pemeriksaan Baru'; ?></h4>
-                    </div>
-                    <div class="card-body">
-                        <form method="POST" action="">
-                            <input type="hidden" name="is_update" value="<?php echo $is_edit_mode ? '1' : '0'; ?>">
-                            <input type="hidden" name="id_berobat_post" value="<?php echo $id_berobat_edit; ?>">
+                            <form action="form_pemeriksaan.php<?= $is_edit_mode ? '?id='.$id_berobat_edit : '' ?>" method="POST" id="pemeriksaanForm">
+                                <input type="hidden" name="id_card" id="input_id_card" value="<?= htmlspecialchars($id_card_cari); ?>">
+                                <?php if ($is_edit_mode): ?>
+                                    <input type="hidden" name="id_berobat_edit" value="<?= $id_berobat_edit; ?>">
+                                <?php endif; ?>
 
-                            <div class="row">
-                                <div class="col-md-4">
-                                    <div class="form-group">
-                                        <label for="select_karyawan">Cari Karyawan <span class="text-danger">*</span></label>
-                                        <select id="select_karyawan" class="form-select" name="id_card" required>
-                                            <option value="">-- Ketik nama / ID Card --</option>
-                                            <?php if ($is_edit_mode && $data_karyawan): ?>
-                                                <option value="<?php echo $data_karyawan['id_card']; ?>" selected><?php echo $data_karyawan['nama']; ?> (<?php echo $data_karyawan['id_card']; ?> - <?php echo $data_karyawan['jabatan']; ?>)</option>
+                                <h5 class="text-primary section-header"><i class="bi bi-person-check-fill me-2"></i> 1. Data Pasien & Riwayat</h5>
+                                
+                                <div class="row mb-4">
+                                    <div class="col-md-12">
+                                        <label for="input_id_card_display">Cari Pasien (NIK / Nama) <span class="text-danger">*</span></label>
+                                        <div class="input-group">
+                                            <input type="text" class="form-control" id="input_id_card_display" 
+                                                placeholder="Ketik NIK atau Nama lalu klik Cari"
+                                                value="<?= $data_karyawan['nama'] ?? $data_karyawan['id_card'] ?? '' ?>"
+                                                <?= $is_edit_mode ? 'readonly' : '' ?> required>
+                                            
+                                            <button class="btn btn-primary" type="button" id="btn_search_karyawan" <?= $is_edit_mode ? 'disabled' : '' ?>>
+                                                <i class="bi bi-search"></i> Cari
+                                            </button>
+                                            <button class="btn btn-secondary" type="button" id="btn_clear_karyawan" <?= $is_edit_mode ? 'disabled' : '' ?>>
+                                                <i class="bi bi-x-circle"></i> Reset
+                                            </button>
+                                        </div>
+                                        <small class="text-muted" id="search_feedback">
+                                            <?php if ($data_karyawan): ?>
+                                                Pasien saat ini: **<?= htmlspecialchars($data_karyawan['nama']) ?>** (<?= htmlspecialchars($data_karyawan['id_card']) ?>)
+                                            <?php else: ?>
+                                                Masukkan NIK atau Nama Karyawan untuk memulai.
                                             <?php endif; ?>
-                                        </select>
+                                        </small>
+                                        <div id="search_results" class="list-group mt-1">
+                                            </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div class="row mt-3">
-                                <div class="col-12">
-                                    <div class="card">
-                                        <div class="card-header bg-primary text-white">
-                                            <h5 class="card-title mb-0">Informasi Pasien</h5>
+                                <div class="row mb-4">
+                                    <div class="col-md-6">
+                                        <div class="info-box">
+                                            <h6 class="text-primary"><i class="bi bi-person-vcard me-1"></i> Detail Pasien</h6>
+                                            <p class="card-text">
+                                                <span class="fw-bold">NIK:</span> <span id="display_nik"><?= htmlspecialchars($data_karyawan['id_card'] ?? '-') ?></span><br>
+                                                <span class="fw-bold">Nama:</span> <span id="display_nama"><?= htmlspecialchars($data_karyawan['nama'] ?? '-') ?></span>
+                                            </p>
+                                            <hr>
+                                            <h6 class="text-primary"><i class="bi bi-briefcase-fill me-1"></i> Info Pekerjaan</h6>
+                                            <div class="form-group">
+                                                <label class="small text-muted">Jabatan</label>
+                                                <input type="text" class="form-control form-control-sm" id="karyawan_jabatan" value="<?= htmlspecialchars($data_karyawan['jabatan'] ?? '') ?>" readonly>
+                                            </div>
+                                            <div class="form-group">
+                                                <label class="small text-muted">Departemen</label>
+                                                <input type="text" class="form-control form-control-sm" id="karyawan_departemen" value="<?= htmlspecialchars($data_karyawan['departemen'] ?? '') ?>" readonly>
+                                            </div>
                                         </div>
-                                        <div class="card-body">
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <div class="info-box danger-box">
+                                            <h6 class="text-danger"><i class="bi bi-shield-exclamation-fill me-1"></i> Riwayat Kritis</h6>
                                             <div class="row">
-                                                <div class="col-md-3"><strong>Nama:</strong> <span id="nama_karyawan" class="text-primary"><?php echo $data_karyawan['nama'] ?? '-'; ?></span></div>
-                                                <div class="col-md-3"><strong>ID Card:</strong> <span id="id_card_display"><?php echo $data_karyawan['id_card'] ?? '-'; ?></span></div>
-                                                <div class="col-md-3"><strong>Jabatan:</strong> <span id="jabatan_karyawan"><?php echo $data_karyawan['jabatan'] ?? '-'; ?></span></div>
-                                                <div class="col-md-3"><strong>Departemen:</strong> <span id="departemen_karyawan"><?php echo $data_karyawan['departemen'] ?? '-'; ?></span></div>
+                                                <div class="col-md-6">
+                                                    <div class="form-group">
+                                                        <label class="small text-muted">Golongan Darah</label>
+                                                        <input type="text" class="form-control form-control-sm" id="riwayat_goldar" value="<?= htmlspecialchars($riwayat_medis['golongan_darah'] ?? '') ?>" readonly>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="form-group">
+                                                        <label class="small text-muted">Alergi</label>
+                                                        <input type="text" class="form-control form-control-sm" id="riwayat_alergi" value="<?= htmlspecialchars($riwayat_medis['alergi'] ?? '') ?>" readonly>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="form-group">
+                                                <label class="small text-muted">Penyakit Terdahulu</label>
+                                                <input type="text" class="form-control form-control-sm" id="riwayat_penyakit" value="<?= htmlspecialchars($riwayat_medis['penyakit_terdahulu'] ?? '') ?>" readonly>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div class="row">
-                                <div class="col-12">
-                                    <div class="card">
-                                        <div class="card-header bg-danger text-white">
-                                            <h5 class="card-title mb-0">Riwayat Medis Kritis</h5>
+                                <h5 class="text-info section-header"><i class="bi bi-heart-pulse-fill me-2"></i> 2. Anamnesa & Diagnosis</h5>
+
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label for="tekanan_darah">Tekanan Darah (mmHg) <span class="text-danger">*</span></label>
+                                            <input type="text" id="tekanan_darah" class="form-control" name="tekanan_darah" placeholder="Cth: 120/80" value="<?= postValue('tekanan_darah', $data_pemeriksaan_edit); ?>" required>
                                         </div>
-                                        <div class="card-body">
-                                            <div class="row">
-                                                <div class="col-md-4"><strong>Golongan Darah:</strong> <span id="golongan_darah" class="text-danger fw-bold"><?php echo $riwayat_medis['golongan_darah'] ?? '-'; ?></span></div>
-                                                <div class="col-md-4"><strong>Alergi:</strong> <span id="alergi" class="text-danger fw-bold"><?php echo $riwayat_medis['alergi'] ?? 'TIDAK ADA'; ?></span></div>
-                                                <div class="col-md-4"><strong>Penyakit Terdahulu:</strong> <span id="penyakit_terdahulu"><?php echo $riwayat_medis['penyakit_terdahulu'] ?? '-'; ?></span></div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label for="suhu_tubuh">Suhu Tubuh (°C) <span class="text-danger">*</span></label>
+                                            <input type="number" step="0.1" id="suhu_tubuh" class="form-control" name="suhu_tubuh" placeholder="Cth: 36.5" value="<?= postValue('suhu_tubuh', $data_pemeriksaan_edit); ?>" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-group">
+                                            <label>Petugas Pemeriksa</label>
+                                            <input type="text" class="form-control" value="<?= htmlspecialchars($petugas); ?>" readonly>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="keluhan">Keluhan Utama <span class="text-danger">*</span></label>
+                                    <textarea id="keluhan" class="form-control" name="keluhan" rows="3" required><?= postValue('keluhan', $data_pemeriksaan_edit); ?></textarea>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="diagnosis">Diagnosis <span class="text-danger">*</span></label>
+                                    <textarea id="diagnosis" class="form-control" name="diagnosis" rows="3" required><?= postValue('diagnosis', $data_pemeriksaan_edit); ?></textarea>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="tindakan">Tindakan Medis / Instruksi <span class="text-danger">*</span></label>
+                                            <textarea id="tindakan" class="form-control" name="tindakan" rows="2" required><?= postValue('tindakan', $data_pemeriksaan_edit); ?></textarea>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="rujukan">Rujukan (Opsional)</label>
+                                            <input type="text" id="rujukan" class="form-control" name="rujukan" placeholder="Cth: Rujuk ke RSUD X" value="<?= postValue('rujukan', $data_pemeriksaan_edit); ?>">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="catatan">Catatan Tambahan (Opsional)</label>
+                                            <textarea id="catatan" class="form-control" name="catatan" rows="1"><?= postValue('catatan', $data_pemeriksaan_edit); ?></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+
+
+                                <h5 class="text-success section-header mt-4"><i class="bi bi-capsule-pill me-2"></i> 3. Resep Obat</h5>
+                                <p class="text-muted">Masukkan obat yang diresepkan. Stok obat akan dikurangi secara otomatis.</p>
+                                
+                                <div id="resep_container">
+                                    <?php 
+                                    $resep_index = 0;
+                                    if (!empty($resep_to_load)):
+                                        foreach ($resep_to_load as $resep):
+                                    ?>
+                                    <div class="row gx-2 align-items-center resep-row" id="row-<?= $resep_index ?>">
+                                        <div class="col-md-5 col-12 position-relative">
+                                            <label class="form-label visually-hidden">Nama Obat</label>
+                                            <div class="input-group">
+                                                <input type="text" class="form-control obat-display-input" id="obat_display_<?= $resep_index ?>" 
+                                                    placeholder="Cari Nama/Kode Obat" 
+                                                    value="<?= htmlspecialchars($resep['nama_obat']) . ' (' . htmlspecialchars($resep['satuan']) . ')' ?>" required>
+                                                <input type="hidden" class="obat-id-hidden" name="obat_id[]" value="<?= htmlspecialchars($resep['id_obat']); ?>">
+                                                
+                                                <button class="btn btn-info btn-search-obat" type="button" data-index="<?= $resep_index ?>">
+                                                    <i class="bi bi-search"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger btn-hapus-obat" type="button" data-index="<?= $resep_index ?>"><i class="bi bi-trash"></i></button>
+                                            </div>
+                                            <div id="obat_search_results_<?= $resep_index ?>" class="list-group list-group-flush mt-1 search-result-box">
+                                                </div>
+                                        </div>
+
+                                        <div class="col-md-3 col-6 mt-2 mt-md-0">
+                                            <label class="form-label visually-hidden">Jumlah</label>
+                                            <div class="input-group input-group-sm">
+                                                <input type="number" class="form-control jumlah-input" name="jumlah_keluar[]" min="1" 
+                                                    placeholder="Jumlah (Max: <?= $resep['stok_tersedia'] + ($is_edit_mode ? $resep['jumlah'] : 0) ?>)" 
+                                                    value="<?= htmlspecialchars($resep['jumlah']); ?>" required>
+                                                <span class="input-group-text satuan-display"><?= htmlspecialchars($resep['satuan'] ?? 'Unit') ?></span>
                                             </div>
                                         </div>
+                                        <div class="col-md-4 col-6 mt-2 mt-md-0 d-flex align-items-center">
+                                            <small class="text-muted stok-info me-2">
+                                                Stok: <?= number_format($resep['stok_tersedia']) ?> 
+                                                (Max: <?= number_format($resep['stok_tersedia'] + ($is_edit_mode ? $resep['jumlah'] : 0)) ?>)
+                                            </small>
+                                        </div>
                                     </div>
+                                    <?php 
+                                        $resep_index++;
+                                        endforeach;
+                                    endif; 
+                                    ?>
                                 </div>
-                            </div>
-
-                            <h5 class="mt-4">Detail Pemeriksaan</h5>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label>Keluhan Utama</label>
-                                        <textarea class="form-control" rows="3" name="keluhan" required><?php echo postValue('keluhan', '', $data_pemeriksaan); ?></textarea>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label>Diagnosis</label>
-                                        <textarea class="form-control" rows="3" name="diagnosis"><?php echo postValue('diagnosis', '', $data_pemeriksaan); ?></textarea>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-3">
-                                    <div class="form-group">
-                                        <label>Tekanan Darah (mmHg)</label>
-                                        <input type="text" class="form-control" name="tekanan_darah" placeholder="120/80" value="<?php echo postValue('tekanan_darah', '', $data_pemeriksaan); ?>">
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="form-group">
-                                        <label>Suhu Tubuh (°C)</label>
-                                        <input type="text" class="form-control" name="suhu_tubuh" placeholder="36.5" value="<?php echo postValue('suhu_tubuh', '', $data_pemeriksaan); ?>">
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="form-group">
-                                        <label>Nadi (bpm)</label>
-                                        <input type="text" class="form-control" name="nadi" placeholder="80" value="<?php echo postValue('nadi', '', $data_pemeriksaan); ?>">
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="form-group">
-                                        <label>Pernafasan (rpm)</label>
-                                        <input type="text" class="form-control" name="pernafasan" placeholder="16" value="<?php echo postValue('pernafasan', '', $data_pemeriksaan); ?>">
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label>Tindakan / Resep Obat</label>
-                                        <textarea class="form-control" rows="3" name="tindakan"><?php echo postValue('tindakan', '', $data_pemeriksaan); ?></textarea>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label>Rujukan</label>
-                                        <input type="text" class="form-control" name="rujukan" placeholder="RS / Spesialis" value="<?php echo postValue('rujukan', '', $data_pemeriksaan); ?>">
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="form-group">
-                                <label>Catatan Tambahan</label>
-                                <textarea class="form-control" rows="2" name="catatan"><?php echo postValue('catatan', '', $data_pemeriksaan); ?></textarea>
-                            </div>
-
-                            <h5 class="mt-4">Resep Obat</h5>
-                            <div id="resep_container" class="mb-3"></div>
-                            <button type="button" id="tambah_obat" class="btn btn-outline-primary btn-sm">+ Tambah Obat</button>
-
-                            <div class="mt-4">
-                                <button type="submit" name="simpan_pemeriksaan" class="btn btn-success">
-                                    <i class="bi bi-save"></i> <?php echo $is_edit_mode ? 'Update' : 'Simpan'; ?> Pemeriksaan
+                                
+                                <button type="button" id="tambah_obat" class="btn btn-sm btn-success mt-3">
+                                    <i class="bi bi-plus-circle me-1"></i> Tambah Obat
                                 </button>
-                                <a href="riwayat_berobat.php" class="btn btn-secondary">
-                                    <i class="bi bi-arrow-left"></i> Kembali
-                                </a>
-                            </div>
-                        </form>
+                                
+                                <hr class="mt-5">
+                                <div class="d-flex justify-content-end">
+                                    <button type="submit" class="btn btn-primary me-2" name="simpan_pemeriksaan" id="btnSimpanFinal">
+                                        <i class="bi bi-save me-2"></i> <?= $is_edit_mode ? 'Update Pemeriksaan' : 'Simpan Pemeriksaan' ?>
+                                    </button>
+                                    <a href="riwayat_berobat.php" class="btn btn-light-secondary">Batal</a>
+                                </div>
+                            </form>
+                            
+                        </div>
                     </div>
-                </div>
-            </section>
-
+                </section>
+            </div>
+            
             <footer>
                 <div class="footer clearfix mb-0 text-muted">
                     <div class="float-start">
                         <p>2025 &copy; Daelim</p>
                     </div>
-                    <div class="float-end">
-                        <p>Crafted with <span class="text-danger"><i class="bi bi-heart-fill icon-mid"></i></span> by <a href="https://daelim.id">IT PT. Daelim Indonesia</a></p>
-                    </div>
                 </div>
             </footer>
         </div>
     </div>
-
-    <script src="../../assets/static/js/components/dark.js"></script>
+    
+    <script src="../../assets/extensions/jquery/jquery.min.js"></script>
     <script src="../../assets/extensions/perfect-scrollbar/perfect-scrollbar.min.js"></script>
     <script src="../../assets/compiled/js/app.js"></script>
-
-    <!-- jQuery & Select2 -->
-    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-
     <script>
-        let resepCounter = 0;
-        const editResepData = <?php echo json_encode($data_resep); ?>;
+    $(document).ready(function() {
+        // Variabel untuk menghitung baris resep. Mulai dari PHP index + 1
+        let resepCounter = <?= $resep_index ?>;
 
-        function addResepRow(data = null) {
-            resepCounter++;
-            const rowId = 'row_' + resepCounter;
-            const html = `
-                <div class="row row-resep mb-3" id="${rowId}">
-                    <div class="col-md-5">
-                        <label>Obat</label>
-                        <select class="form-select obat-select" name="obat_id[]" required></select>
-                    </div>
-                    <div class="col-md-3">
-                        <label>Jumlah</label>
-                        <input type="number" class="form-control jumlah-input" name="jumlah[]" min="1" placeholder="Jumlah" ${data ? 'value="' + data.jumlah + '"' : ''} disabled>
-                    </div>
-                    <div class="col-md-2">
-                        <label>Satuan</label>
-                        <span class="form-control-plaintext satuan-display">-</span>
-                    </div>
-                    <div class="col-md-2 d-flex align-items-end">
-                        <button type="button" class="btn btn-danger btn-sm remove-row">Hapus</button>
-                    </div>
-                    <div class="col-12"><small class="stok-info text-muted"></small></div>
-                </div>`;
-            $('#resep_container').append(html);
+        // Data resep lama (khusus untuk perhitungan Max Stok di Edit Mode)
+        const resepDataEditMode = <?= json_encode($data_resep_edit) ?>;
+        const isEditMode = <?= $is_edit_mode ? 'true' : 'false' ?>;
 
-            const $select = $('#' + rowId + ' .obat-select');
-            initObatSelect($select, data);
+        // --- FUNGSI RESET SEMUA FIELD PASIEN ---
+        function resetPatientFields() {
+            $('#input_id_card').val('');
+            $('#input_id_card_display').val('');
+            $('#display_nik').text('-');
+            $('#display_nama').text('-');
+            $('#karyawan_jabatan').val('');
+            $('#karyawan_departemen').val('');
+            $('#riwayat_goldar').val('TIDAK DIKETAHUI');
+            $('#riwayat_alergi').val('TIDAK ADA');
+            $('#riwayat_penyakit').val('TIDAK ADA');
+            $('#search_results').empty();
+            $('#search_feedback').html('Masukkan NIK atau Nama Karyawan untuk memulai.');
         }
 
-        function initObatSelect($el, data) {
-            $el.select2({
-                placeholder: 'Cari nama obat...',
-                allowClear: true,
-                ajax: {
-                    url: 'api_obat.php',
-                    dataType: 'json',
-                    delay: 300,
-                    data: params => ({ query: params.term }),
-                    processResults: data => ({ results: data.results || [] })
-                },
-                minimumInputLength: 2,
-                templateResult: item => item.nama_obat ? `${item.nama_obat} (${item.satuan}) - Stok: ${item.stok_tersedia}` : item.text,
-                templateSelection: item => item.nama_obat ? `${item.nama_obat} (${item.satuan})` : item.text
-            }).on('select2:select', function (e) {
-                const d = e.params.data;
-                const $row = $(this).closest('.row-resep');
-                $row.find('.jumlah-input').prop('disabled', false).attr('max', d.stok_tersedia);
-                $row.find('.satuan-display').text(d.satuan);
-                $row.find('.stok-info').text(`Stok tersedia: ${d.stok_tersedia} ${d.satuan}`).removeClass('text-danger').addClass('text-success');
-            }).on('select2:unselect', function () {
-                const $row = $(this).closest('.row-resep');
-                $row.find('.jumlah-input').val('').prop('disabled', true);
-                $row.find('.satuan-display').text('-');
-                $row.find('.stok-info').text('');
-            });
-
-            if (data) {
-                const opt = new Option(`${data.nama_obat} (${data.satuan}) - Stok: ${data.stok_tersedia}`, data.obat_id, true, true);
-                $el.append(opt).trigger('change');
-                $el.trigger({ type: 'select2:select', params: { data: { stok_tersedia: data.stok_tersedia, satuan: data.satuan } } });
-            }
-        }
-
-        $('#tambah_obat').on('click', () => addResepRow());
-        $(document).on('click', '.remove-row', function () {
-            $(this).closest('.row-resep').remove();
-        });
-
-        // Init Karyawan Select2
-        $('#select_karyawan').select2({
-            placeholder: 'Ketik nama atau ID Card...',
-            allowClear: true,
-            ajax: {
-                url: 'api_karyawan.php',
+        // --- FUNGSI MENGISI DETAIL PASIEN (Karyawan + Riwayat) ---
+        function fillPatientDetails(id_card, data_karyawan) {
+            // 1. Isi form Karyawan
+            $('#input_id_card').val(id_card);
+            $('#display_nik').text(data_karyawan.id_card || '-');
+            $('#display_nama').text(data_karyawan.nama || '-');
+            $('#karyawan_jabatan').val(data_karyawan.jabatan || '');
+            $('#karyawan_departemen').val(data_karyawan.departemen || '');
+            $('#search_feedback').html('Pasien saat ini: **' + data_karyawan.nama + '** (' + data_karyawan.id_card + ')');
+            
+            // 2. Ambil Riwayat Medis (AJAX)
+            $.ajax({
+                url: 'get_riwayat_medis_ajax.php?id_card=' + id_card, 
                 dataType: 'json',
-                delay: 300,
-                data: params => ({ query: params.term }),
-                processResults: data => ({ results: data.results || [] })
-            },
-            minimumInputLength: 2
-        }).on('select2:select', function (e) {
-            const d = e.params.data;
-            $('#nama_karyawan').text(d.nama || d.text.split(' (')[0]);
-            $('#id_card_display').text(d.id_card || d.id);
-            $('#jabatan_karyawan').text(d.jabatan || '-');
-            $('#departemen_karyawan').text(d.departemen || '-');
-
-            // Load Riwayat Medis
-            $.get('get_riwayat_medis_ajax.php?id_card=' + (d.id_card || d.id), function (res) {
-                $('#golongan_darah').text(res.golongan_darah || '-');
-                $('#alergi').text(res.alergi || 'TIDAK ADA');
-                $('#penyakit_terdahulu').text(res.penyakit_terdahulu || '-');
-            }, 'json').fail(() => {
-                $('#golongan_darah, #alergi, #penyakit_terdahulu').text('Gagal load');
+                success: function(response) {
+                    $('#riwayat_penyakit').val(response.penyakit_terdahulu || 'TIDAK ADA');
+                    $('#riwayat_alergi').val(response.alergi || 'TIDAK ADA');
+                    $('#riwayat_goldar').val(response.golongan_darah || 'TIDAK DIKETAHUI');
+                }
             });
-        });
+        }
 
-        $(document).ready(function () {
-            if (editResepData.length > 0) {
-                editResepData.forEach(d => addResepRow(d));
-            } else {
-                addResepRow();
+        // --- FUNGSI UTAMA PENCARIAN KARYAWAN ---
+        function searchKaryawan() {
+            const query = $('#input_id_card_display').val().trim();
+            $('#search_results').empty();
+
+            if (query.length < 2) {
+                $('#search_feedback').text('Masukkan minimal 2 karakter (NIK/Nama) untuk mencari.');
+                return;
+            }
+            
+            $('#search_feedback').html('<i class="bi bi-hourglass-split"></i> Mencari...');
+            
+            $.ajax({
+                url: 'api_karyawan.php?query=' + encodeURIComponent(query), 
+                dataType: 'json',
+                success: function(response) {
+                    const results = response.results || [];
+                    
+                    if (results.length > 0) {
+                        $('#search_results').empty(); 
+                        $('#search_feedback').text(results.length + ' hasil ditemukan. Pilih salah satu di bawah:');
+                        
+                        results.forEach(function(item) {
+                            const resultItem = $(`
+                                <a href="#" class="list-group-item list-group-item-action list-group-item-light" 
+                                    data-id="${item.id}" 
+                                    data-nama="${item.text.split('(')[0].trim()}"
+                                    data-jabatan="${item.jabatan}" 
+                                    data-departemen="${item.departemen}">
+                                    ${item.text}
+                                </a>
+                            `);
+                            
+                            // Event listener untuk memilih hasil
+                            resultItem.on('click', function(e) {
+                                e.preventDefault();
+                                const selectedId = $(this).data('id');
+                                const selectedNama = $(this).data('nama');
+                                const selectedJabatan = $(this).data('jabatan');
+                                const selectedDepartemen = $(this).data('departemen');
+                                
+                                // Isi Input Display dengan Nama Karyawan yang dipilih
+                                $('#input_id_card_display').val(selectedNama + ' (' + selectedId + ')');
+                                
+                                // Isi field detail dan riwayat
+                                fillPatientDetails(selectedId, {
+                                    id_card: selectedId,
+                                    nama: selectedNama,
+                                    jabatan: selectedJabatan,
+                                    departemen: selectedDepartemen
+                                });
+                                
+                                $('#search_results').empty(); // Bersihkan hasil
+                            });
+                            
+                            $('#search_results').append(resultItem);
+                        });
+                        
+                    } else {
+                        $('#search_results').empty();
+                        $('#search_feedback').html('<i class="bi bi-x-circle-fill text-danger"></i> Data karyawan tidak ditemukan.');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    $('#search_results').empty();
+                    $('#search_feedback').html('<i class="bi bi-exclamation-triangle-fill text-danger"></i> Error koneksi: Gagal memuat data karyawan.');
+                }
+            });
+        }
+
+        // --- FUNGSI UTAMA PENCARIAN OBAT (MIRIP KARYAWAN) ---
+        function searchObat(rowElement, query) {
+            const index = rowElement.data('index');
+            const resultBox = $(`#obat_search_results_${index}`);
+            resultBox.empty();
+
+            if (query.length < 2) {
+                resultBox.html('<small class="text-muted p-2">Ketik minimal 2 karakter.</small>');
+                return;
+            }
+            
+            resultBox.html('<div class="list-group-item list-group-item-info p-2"><i class="bi bi-hourglass-split"></i> Mencari...</div>');
+            
+            $.ajax({
+                url: 'api_obat.php?query=' + encodeURIComponent(query), 
+                dataType: 'json',
+                success: function(response) {
+                    const results = response.results || [];
+                    
+                    if (results.length > 0) {
+                        resultBox.empty();
+                        
+                        results.forEach(function(item) {
+                            const maxStokTersedia = parseInt(item.stok);
+                            let maxLimit = maxStokTersedia;
+
+                            // Jika mode edit, tambahkan stok yang diresepkan sebelumnya untuk obat ini
+                            if (isEditMode) {
+                                const resepLama = resepDataEditMode.find(r => r.id_obat == item.id);
+                                if (resepLama) {
+                                    maxLimit += parseInt(resepLama.jumlah);
+                                }
+                            }
+                            
+                            const resultItem = $(`
+                                <a href="#" class="list-group-item list-group-item-action list-group-item-light" 
+                                    data-id="${item.id}" 
+                                    data-nama="${item.nama}" 
+                                    data-satuan="${item.satuan}"
+                                    data-stok="${item.stok}"
+                                    data-max-limit="${maxLimit}">
+                                    ${item.text}
+                                    <span class="badge bg-success float-end">Stok: ${item.stok}</span>
+                                </a>
+                            `);
+                            
+                            // Event listener untuk memilih hasil
+                            resultItem.on('click', function(e) {
+                                e.preventDefault();
+                                const $this = $(this);
+                                const selectedId = $this.data('id');
+                                const selectedNama = $this.data('nama');
+                                const selectedSatuan = $this.data('satuan');
+                                const selectedStok = $this.data('stok');
+                                const selectedMaxLimit = $this.data('max-limit');
+                                
+                                const parentRow = $this.closest('.resep-row');
+                                
+                                // Isi Input Display dan Hidden ID
+                                parentRow.find('.obat-display-input').val(selectedNama + ' (' + selectedSatuan + ')');
+                                parentRow.find('.obat-id-hidden').val(selectedId);
+                                
+                                // Atur Input Jumlah
+                                const jumlahInput = parentRow.find('.jumlah-input');
+                                jumlahInput.attr('max', selectedMaxLimit).val(1).attr('placeholder', 'Max: ' + selectedMaxLimit).prop('disabled', false);
+                                
+                                // Update info stok dan satuan
+                                parentRow.find('.satuan-display').text(selectedSatuan);
+                                parentRow.find('.stok-info').html('Stok: ' + selectedStok + ' (Max: ' + selectedMaxLimit + ')').removeClass('text-danger').addClass('text-success');
+                                
+                                resultBox.empty(); // Bersihkan hasil
+                            });
+                            
+                            resultBox.append(resultItem);
+                        });
+                        
+                    } else {
+                        resultBox.html('<div class="list-group-item list-group-item-warning p-2">Obat tidak ditemukan atau stok kosong.</div>');
+                    }
+                },
+                error: function() {
+                    resultBox.html('<div class="list-group-item list-group-item-danger p-2">Error koneksi: Gagal memuat data obat.</div>');
+                }
+            });
+        }
+
+
+        // --- FUNGSI DINAMIS TAMBAH BARIS OBAT ---
+        function addObatRow(initialResepData = {}) {
+            const index = resepCounter++;
+            
+            const isPreFilled = initialResepData.id_obat;
+            const currentStock = initialResepData.stok_tersedia || 0;
+            const currentAmount = initialResepData.jumlah || 0;
+            const currentSatuan = initialResepData.satuan || 'Unit';
+            
+            let maxLimit = currentStock;
+            if (isEditMode && isPreFilled) {
+                // Tambahkan jumlah yang sudah diresepkan sebelumnya agar bisa di edit
+                maxLimit = currentStock + currentAmount; 
             }
 
-            <?php if ($is_edit_mode && $data_karyawan): ?>
-                // Trigger manual untuk edit mode
-                $('#select_karyawan').trigger({
-                    type: 'select2:select',
-                    params: { data: { id: '<?php echo $data_karyawan['id_card']; ?>', text: '<?php echo $data_karyawan['nama']; ?> (<?php echo $data_karyawan['id_card']; ?>)', nama: '<?php echo $data_karyawan['nama']; ?>', jabatan: '<?php echo $data_karyawan['jabatan']; ?>', departemen: '<?php echo $data_karyawan['departemen']; ?>' } }
-                });
-            <?php endif; ?>
+            const displayValue = isPreFilled ? 
+                initialResepData.nama_obat + ' (' + currentSatuan + ')' : '';
+
+            const newRow = $(`
+                <div class="row gx-2 align-items-center resep-row" id="row-${index}" data-index="${index}">
+                    <div class="col-md-5 col-12 position-relative">
+                        <label class="form-label visually-hidden">Nama Obat</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control obat-display-input" id="obat_display_${index}" 
+                                placeholder="Cari Nama/Kode Obat" 
+                                value="${displayValue}" required>
+                            <input type="hidden" class="obat-id-hidden" name="obat_id[]" value="${initialResepData.id_obat || ''}">
+                            
+                            <button class="btn btn-info btn-search-obat" type="button" data-index="${index}">
+                                <i class="bi bi-search"></i>
+                            </button>
+                            <button class="btn btn-danger btn-hapus-obat" type="button" data-index="${index}"><i class="bi bi-trash"></i></button>
+                        </div>
+                        <div id="obat_search_results_${index}" class="list-group list-group-flush mt-1 search-result-box">
+                        </div>
+                    </div>
+
+                    <div class="col-md-3 col-6 mt-2 mt-md-0">
+                        <label class="form-label visually-hidden">Jumlah</label>
+                        <div class="input-group input-group-sm">
+                            <input type="number" class="form-control jumlah-input" name="jumlah_keluar[]" min="1" 
+                                placeholder="Jumlah (Max: ${maxLimit})" 
+                                value="${currentAmount || ''}" 
+                                ${isPreFilled ? '' : 'disabled'} required>
+                            <span class="input-group-text satuan-display">${currentSatuan}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-6 mt-2 mt-md-0 d-flex align-items-center">
+                        <small class="text-muted stok-info me-2 ${isPreFilled ? 'text-success' : ''}">
+                            ${isPreFilled ? 'Stok: ' + currentStock + ' (Max: ' + maxLimit + ')' : ''}
+                        </small>
+                    </div>
+                </div>
+            `);
+            
+            $('#resep_container').append(newRow);
+
+            // ----------------------------------------------------
+            // EVENT LISTENERS UNTUK BARIS OBAT YANG BARU DITAMBAHKAN
+            // ----------------------------------------------------
+
+            // 1. Tombol Search Obat
+            newRow.find('.btn-search-obat').on('click', function() {
+                const query = newRow.find('.obat-display-input').val().trim();
+                searchObat(newRow, query);
+            });
+
+            // 2. Tombol Hapus Obat
+            newRow.find('.btn-hapus-obat').on('click', function() {
+                newRow.remove();
+            });
+
+            // 3. Pemicu pencarian saat menekan Enter atau input berubah
+            newRow.find('.obat-display-input').on('keypress', function(e) {
+                if (e.which === 13) { // Key code for Enter
+                    e.preventDefault();
+                    newRow.find('.btn-search-obat').click();
+                }
+            });
+            
+            // 4. Batasan Input Jumlah
+            newRow.find('.jumlah-input').on('change keyup', function() {
+                const input = $(this);
+                const max = parseInt(input.attr('max'));
+                const val = parseInt(input.val());
+                if (max && val > max) input.val(max);
+                else if (val < 1) input.val(1);
+            });
+
+            // 5. Clear Input Obat saat diketik ulang
+            newRow.find('.obat-display-input').on('input', function() {
+                // Hapus ID dan info stok saat mulai mengetik ulang
+                newRow.find('.obat-id-hidden').val('');
+                newRow.find('.jumlah-input').val('').prop('disabled', true);
+                newRow.find('.stok-info').text('');
+            });
+        }
+
+
+        // --- EVENT HANDLERS KARYAWAN (Tidak Berubah) ---
+        $('#btn_search_karyawan').on('click', searchKaryawan);
+        $('#btn_clear_karyawan').on('click', resetPatientFields);
+        
+        $('#input_id_card_display').on('keypress', function(e) {
+            if (e.which === 13) { 
+                e.preventDefault();
+                searchKaryawan();
+            }
         });
+
+
+        // --- INISIALISASI HALAMAN ---
+        
+        // 1. Muat data resep (jika mode edit atau POST gagal)
+        if (resepDataFromPHP.length > 0) {
+            resepDataFromPHP.forEach(data => addObatRow(data));
+        } else {
+            // 2. Tambah baris resep kosong jika tidak ada data awal
+             addObatRow();
+        }
+
+    });
     </script>
 </body>
 </html>

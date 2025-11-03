@@ -1,5 +1,5 @@
 <?php
-// File: api_karyawan.php
+// File: api_karyawan.php (Koreksi Final untuk Select2 & Fungsionalitas)
 header('Content-Type: application/json');
 include('../../config/koneksi.php');
 
@@ -20,13 +20,15 @@ if (isset($_GET['query'])) {
         while ($row = mysqli_fetch_assoc($result)) {
             $results[] = [
                 'id' => $row['id_card'],
-                // Teks yang ditampilkan di dropdown: Nama (ID Card - Jabatan)
-                'text' => $row['nama'] . ' (' . $row['id_card'] . ' - ' . $row['jabatan'] . ')'
+                'text' => $row['nama'] . ' (' . $row['id_card'] . ' - ' . $row['jabatan'] . ')',
+                // --- KUNCI TAMBAHAN AGAR JS BISA MENGISI FIELD JABATAN & DEPARTEMEN ---
+                'jabatan' => $row['jabatan'], 
+                'departemen' => $row['departemen']
             ];
         }
     }
 } else if (isset($_GET['id_card'])) {
-    // Jika hanya mengambil detail satu karyawan berdasarkan ID Card
+    // Jika hanya mengambil detail satu karyawan berdasarkan ID Card (mode Edit/load)
     $id_card = mysqli_real_escape_string($koneksi, $_GET['id_card']);
     $query = "SELECT id_card, nama, jabatan, departemen FROM karyawan WHERE id_card = '$id_card'";
     $result = mysqli_query($koneksi, $query);
@@ -35,6 +37,9 @@ if (isset($_GET['query'])) {
             'id' => $row['id_card'],
             'nama' => $row['nama'],
             'text' => $row['nama'] . ' (' . $row['id_card'] . ')',
+            // --- KUNCI TAMBAHAN AGAR FORM EDIT BISA MENGAMBIL DATA DETAIL ---
+            'jabatan' => $row['jabatan'], 
+            'departemen' => $row['departemen']
         ];
     }
 }
