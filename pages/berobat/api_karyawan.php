@@ -38,6 +38,7 @@ if (isset($_GET['query'])) {
             'nama' => $row['nama'],
             'text' => $row['nama'] . ' (' . $row['id_card'] . ')',
             // --- KUNCI TAMBAHAN AGAR FORM EDIT BISA MENGAMBIL DATA DETAIL ---
+            'id_card' => $row['id_card'], // DITAMBAHKAN: Untuk konsistensi di client side
             'jabatan' => $row['jabatan'], 
             'departemen' => $row['departemen']
         ];

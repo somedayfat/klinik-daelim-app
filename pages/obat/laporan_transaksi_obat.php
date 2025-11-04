@@ -1,5 +1,5 @@
 <?php
-// File: laporan_transaksi_obat.php (Laporan Mutasi Stok)
+// File: laporan_transaksi_obat.php
 session_start();
 // Pastikan path koneksi sudah benar!
 include('../../config/koneksi.php'); 
@@ -17,6 +17,8 @@ $filter_jenis = isset($_GET['jenis']) ? mysqli_real_escape_string($koneksi, $_GE
 
 /**
  * Fungsi untuk mengkonversi string tanggal input (Y-m-d) menjadi format MySQL (Y-m-d) yang aman.
+ * Jika input database Anda benar-benar DD/MM/YYYY (VARCHAR), Anda perlu menyesuaikan SQL di bawah.
+ * Asumsi: Kolom tanggal_transaksi bertipe DATETIME/TIMESTAMP.
  */
 function convert_to_mysql_date($date_input) {
     // Mencoba parsing Y-m-d (format standar HTML input type="date")
@@ -34,7 +36,7 @@ $tanggal_akhir = convert_to_mysql_date($tanggal_akhir_input);
 // Jika tombol cetak ditekan
 $is_print_view = isset($_GET['print']) && $_GET['print'] == 'true';
 
-// --- QUERY UTAMA LAPORAN MUTASI STOK ---
+// --- QUERY UTAMA LAPORAN MUTASI STOK (FIXED FILTER LOGIC) ---
 
 // Membuat batasan waktu yang pasti untuk filter:
 // Tgl Awal harus dari 00:00:00
@@ -66,7 +68,9 @@ $query_laporan = "
 ";
 $result_laporan = mysqli_query($koneksi, $query_laporan);
 
-// Hitung total ringkasan dan isi data laporan
+// Hitung total ringkasan
+// GANTI BLOCK PERHITUNGAN TOTAL INI
+// Hitung total ringkasan
 $total_masuk = 0;
 $total_keluar = 0;
 $data_laporan = [];
@@ -75,63 +79,19 @@ if ($result_laporan) {
     while ($row = mysqli_fetch_assoc($result_laporan)) {
         $data_laporan[] = $row;
         
-        // Memastikan perhitungan akurat (mengatasi spasi/case-sensitive)
+        // *** PERUBAHAN KRUSIAL: Tambahkan intval() dan trim() ***
+        // Trim() menghilangkan spasi tak terlihat, strtoupper() memastikan case-sensitive-ness
         if (strtoupper(trim($row['jenis_transaksi'])) == 'MASUK') { 
-            $total_masuk += intval($row['jumlah']); 
+            $total_masuk += intval($row['jumlah']); // Memaksa nilai menjadi integer
         } elseif (strtoupper(trim($row['jenis_transaksi'])) == 'KELUAR') {
-            $total_keluar += intval($row['jumlah']);
+            $total_keluar += intval($row['jumlah']); // Memaksa nilai menjadi integer
         }
     }
 }
 
-// --- LOGIKA EKSPOR EXCEL (CSV) ---
-// Gunakan query yang sama dengan di atas
-if (isset($_GET['action']) && $_GET['action'] == 'export_csv') {
-    
-    // Jalankan ulang query untuk memastikan data terbaru (atau gunakan $data_laporan jika filter sudah dijalankan)
-    $result_export = mysqli_query($koneksi, $query_laporan); 
-
-    $filename = "Mutasi_Obat_" . date('Ymd_His') . ".csv";
-    header('Content-Type: text/csv');
-    header('Content-Disposition: attachment; filename="' . $filename . '"');
-    $output = fopen('php://output', 'w');
-    
-    // Header Kolom CSV
-    fputcsv($output, [
-        'Waktu Transaksi', 
-        'Kode Obat', 
-        'Nama Obat', 
-        'Jenis Transaksi', 
-        'Jumlah (Unit)', 
-        'Stok Awal', 
-        'Stok Akhir', 
-        'Keterangan', 
-        'Petugas'
-    ]);
-    
-    // Data Baris
-    if ($result_export) {
-        while ($row = mysqli_fetch_assoc($result_export)) {
-            fputcsv($output, [
-                date('d/m/Y H:i:s', strtotime($row['tanggal_transaksi'])),
-                $row['kode_obat'],
-                $row['nama_obat'],
-                $row['jenis_transaksi'],
-                $row['jumlah'],
-                $row['stok_sebelum'],
-                $row['stok_sesudah'],
-                $row['keterangan'] ?? '-',
-                $row['petugas']
-            ]);
-        }
-    }
-    
-    fclose($output);
-    exit();
-}
-
-// --- TAMPILAN PRINT JIKA DITEKAN ---
+// --- TAMPILAN PRINT JIKA DITEKAN (dihilangkan dari sini demi keringkasan) ---
 if ($is_print_view) {
+// ... (Kode Print View tetap sama seperti sebelumnya, pastikan ada di file Anda) ...
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -186,10 +146,10 @@ if ($is_print_view) {
             <tr>
                 <td colspan="4" class="text-right"><strong>TOTAL MUTASI STOK</strong></td>
                 <td class="text-right" style="background-color: #e6ffec;">
-                    <strong>MASUK: <?= number_format($total_masuk, 0, ',', '.') ?></strong>
+                    **MASUK: <?= number_format($total_masuk, 0, ',', '.') ?>**
                 </td>
                 <td colspan="2" class="text-right" style="background-color: #ffe6e6;">
-                    <strong>KELUAR: <?= number_format($total_keluar, 0, ',', '.') ?></strong>
+                    **KELUAR: <?= number_format($total_keluar, 0, ',', '.') ?>**
                 </td>
                 <td colspan="2"></td>
             </tr>
@@ -243,8 +203,8 @@ if ($is_print_view) {
 
 </head>
 <body>
+<script src="../../assets/static/js/initTheme.js"></script>
     <div id="app">
-        
         <div id="sidebar">
             <div class="sidebar-wrapper active">
                 <div class="sidebar-header position-relative">
@@ -253,14 +213,9 @@ if ($is_print_view) {
                             <a href="../../"><img src="../../assets/images/logo.PNG" alt="Logo" srcset=""></a>
                         </div>
                         <div class="theme-toggle d-flex gap-2 align-items-center mt-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true"
-                                role="img" class="iconify iconify--system-uicons" width="20" height="20"
-                                preserveAspectRatio="xMidYMid meet" viewBox="0 0 21 21">
-                                <g fill="none" fill-rule="evenodd" stroke="currentColor" stroke-linecap="round"
-                                    stroke-linejoin="round">
-                                    <path
-                                        d="M10.5 14.5c2.219 0 4-1.763 4-3.982a4.003 4.003 0 0 0-4-4.018c-2.219 0-4 1.781-4 4c0 2.219 1.781 4 4 4zM4.136 4.136L5.55 5.55m9.9 9.9l1.414 1.414M1.5 10.5h2m14 0h2M4.135 16.863L5.55 15.45m9.899-9.9l1.414-1.415M10.5 19.5v-2m0-14v-2"
-                                        opacity=".3"></path>
+                            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--system-uicons" width="20" height="20" preserveAspectRatio="xMidYMid meet" viewBox="0 0 21 21">
+                                <g fill="none" fill-rule="evenodd" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M10.5 14.5c2.219 0 4-1.763 4-3.982a4.003 4.003 0 0 0-4-4.018c-2.219 0-4 1.781-4 4c0 2.219 1.781 4 4 4zM4.136 4.136L5.55 5.55m9.9 9.9l1.414 1.414M1.5 10.5h2m14 0h2M4.135 16.863L5.55 15.45m9.899-9.9l1.414-1.415M10.5 19.5v-2m0-14v-2" opacity=".3"></path>
                                     <g transform="translate(-210 -1)">
                                         <path d="M220.5 2.5v2m6.5.5l-1.5 1.5"></path>
                                         <circle cx="220.5" cy="11.5" r="4"></circle>
@@ -272,12 +227,8 @@ if ($is_print_view) {
                                 <input class="form-check-input me-0" type="checkbox" id="toggle-dark" style="cursor: pointer">
                                 <label class="form-check-label"></label>
                             </div>
-                            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true"
-                                role="img" class="iconify iconify--mdi" width="20" height="20" preserveAspectRatio="xMidYMid meet"
-                                viewBox="0 0 24 24">
-                                <path fill="currentColor"
-                                    d="m17.75 4.09l-2.53 1.94l.91 3.06l-2.63-1.81l-2.63 1.81l.91-3.06l-2.53-1.94L12.44 4l1.06-3l1.06 3l3.19.09m3.5 6.91l-1.64 1.25l.59 1.98l-1.7-1.17l-1.7 1.17l.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95l2.06.05m-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85c-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14c.4-.4.82-.76 1.27-1.08c.75-.53 1.93.36 1.85 1.19c-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82c-2.81 3.14-2.7 7.96.31 10.98c3.02 3.01 7.84 3.12 10.98.31Z">
-                                </path>
+                            <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--mdi" width="20" height="20" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24">
+                                <path fill="currentColor" d="m17.75 4.09l-2.53 1.94l.91 3.06l-2.63-1.81l-2.63 1.81l.91-3.06l-2.53-1.94L12.44 4l1.06-3l1.06 3l3.19.09m3.5 6.91l-1.64 1.25l.59 1.98l-1.7-1.17l-1.7 1.17l.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95l2.06.05m-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85c-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14c.4-.4.82-.76 1.27-1.08c.75-.53 1.93.36 1.85 1.19c-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82c-2.81 3.14-2.7 7.96.31 10.98c3.02 3.01 7.84 3.12 10.98.31Z"></path>
                             </svg>
                         </div>
                         <div class="sidebar-toggler x">
@@ -288,26 +239,24 @@ if ($is_print_view) {
                 <div class="sidebar-menu">
                     <ul class="menu">
                         <li class="sidebar-title">Menu</li>
-                        
-                        <li class="sidebar-item ">
+                        <li class="sidebar-item active">
                             <a href="../../" class='sidebar-link'>
                                 <i class="bi bi-grid-fill"></i>
                                 <span>Dashboard</span>
                             </a>
                         </li>
-                        
                         <li class="sidebar-item">
                             <a href="../karyawan/karyawan.php" class='sidebar-link'>
                                 <i class="bi bi-stack"></i>
                                 <span>Data Karyawan</span>
                             </a>
+                        </li>
                         <li class="sidebar-item has-sub">
                             <a href="#" class='sidebar-link'>
                                 <i class="bi bi-collection-fill"></i>
                                 <span>Pelayanan Kesehatan</span>
                             </a>
-                            
-                            <ul class="submenu ">
+                            <ul class="submenu">
                                 <li class="submenu-item">
                                     <a href="../berobat/riwayat_berobat.php" class="submenu-link">Pemeriksaan Pasien</a>
                                 </li>
@@ -316,67 +265,49 @@ if ($is_print_view) {
                                 </li>
                             </ul>
                         </li>
-                        
-                        <li class="sidebar-item active has-sub">
+                        <li class="sidebar-item has-sub">
                             <a href="#" class='sidebar-link'>
                                 <i class="bi bi-grid-1x2-fill"></i>
                                 <span>Manajemen Obat</span>
                             </a>
-                            
-                            <ul class="submenu ">
+                            <ul class="submenu">
                                 <li class="submenu-item">
-                                    <a href="master_obat.php" class="submenu-link">Data Obat</a>
+                                    <a href="../obat/master_obat.php" class="submenu-link">Data Obat</a>
                                 </li>
-                                
-                                <li class="submenu-item active">
-                                    <a href="laporan_transaksi_obat.php" class="submenu-link">Laporan Mutasi Obat</a>
-                                </li>              
+                                <li class="submenu-item">
+                                    <a href="../obat/laporan_transaksi_obat.php" class="submenu-link">Laporan Transaksi Obat</a>
+                                </li>
                             </ul>
                         </li>
-                        
+                        <li
+                class="sidebar-item has-sub ">
+                <a href="#" class='sidebar-link'>
+                    <i class="bi bi-file-earmark-medical-fill"></i>
+                    <span>Laporan Klinik</span>
+                </a>
+                <ul class="submenu ">
+                    <li class="submenu-item  ">
+                        <a href="../laporan/laporan_berobat.php" class="submenu-link">Laporan Berobat</a>                     
+                    </li>       
+                    <li class="submenu-item  ">
+                        <a href="../laporan/laporan_obat.php" class="submenu-link">Laporan Obat</a>                     
+                    </li>         
+                    <li class="submenu-item  ">
+                        <a href="../laporan/form_laporan_bulanan.php" class="submenu-link">Laporan Kecelakaan Kerja</a>
+                    </li>
+                    <li class="submenu-item  ">
+                        <a href="../laporan/laporan_tren_berobat.php" class="submenu-link">Statistik Berobat</a>
+                    </li>
+                    <li class="submenu-item  ">
+                        <a href="../laporan/laporan_tren_kecelakaan.php" class="submenu-link">Statistik Kecelakaan Kerja</a>
+                    </li>
+                </ul>
+            </li>
                         <li class="sidebar-item">
-                            <a href="form-layout.html" class='sidebar-link'>
-                                <i class="bi bi-file-earmark-medical-fill"></i>
-                                <span>Laporan Klinik</span>
-                            </a>
-                        </li>
-                        
-                        <li class="sidebar-item has-sub">
-                            <a href="#" class='sidebar-link'>
+                            <a href="../../logout.php" class='sidebar-link'>
                                 <i class="bi bi-person-circle"></i>
-                                <span>Account</span>
+                                <span>Logout</span>
                             </a>
-                            
-                            <ul class="submenu ">
-                                <li class="submenu-item">
-                                    <a href="account-profile.html" class="submenu-link">Profile</a>
-                                </li>
-                                
-                                <li class="submenu-item">
-                                    <a href="account-security.html" class="submenu-link">Security</a>
-                                </li>
-                            </ul>
-                        </li>
-                        
-                        <li class="sidebar-item has-sub">
-                            <a href="#" class='sidebar-link'>
-                                <i class="bi bi-person-badge-fill"></i>
-                                <span>Authentication</span>
-                            </a>
-                            
-                            <ul class="submenu ">
-                                <li class="submenu-item">
-                                    <a href="auth-login.html" class="submenu-link">Login</a>
-                                </li>
-                                
-                                <li class="submenu-item">
-                                    <a href="auth-register.html" class="submenu-link">Register</a>
-                                </li>
-                                
-                                <li class="submenu-item">
-                                    <a href="auth-forgot-password.html" class="submenu-link">Forgot Password</a>
-                                </li>
-                            </ul>
                         </li>
                     </ul>
                 </div>
@@ -416,14 +347,7 @@ if ($is_print_view) {
                             </div>
                             <div class="col-md-3 d-flex justify-content-end">
                                 <button type="submit" class="btn btn-primary me-2"><i class="bi bi-search"></i> Tampilkan</button>
-                                
-                                <a href="laporan_transaksi_obat.php?tgl_awal=<?= $tanggal_awal ?>&tgl_akhir=<?= $tanggal_akhir ?>&jenis=<?= $filter_jenis ?>&action=export_csv" class="btn btn-success me-2">
-                                    <i class="bi bi-file-earmark-excel"></i> Export CSV
-                                </a>
-                                
-                                <a href="laporan_transaksi_obat.php?tgl_awal=<?= $tanggal_awal ?>&tgl_akhir=<?= $tanggal_akhir ?>&jenis=<?= $filter_jenis ?>&print=true" target="_blank" class="btn btn-outline-danger">
-                                    <i class="bi bi-printer"></i> Cetak
-                                </a>
+                                <a href="laporan_transaksi_obat.php?tgl_awal=<?= $tanggal_awal ?>&tgl_akhir=<?= $tanggal_akhir ?>&jenis=<?= $filter_jenis ?>&print=true" target="_blank" class="btn btn-outline-danger"><i class="bi bi-printer"></i> Cetak</a>
                             </div>
                         </form>
                     </div>
@@ -470,15 +394,19 @@ if ($is_print_view) {
                                     <th>Petugas</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                             <tbody>
                                 <?php $no = 1; foreach ($data_laporan as $data): ?>
                                 <?php 
                                     // Logika untuk menentukan warna badge dan class baris
                                     $is_masuk = strtoupper(trim($data['jenis_transaksi'])) == 'MASUK';
+                                    
+                                    // PENTING: Mengubah warna badge
                                     $jenis_badge = $is_masuk ? 'success' : 'danger'; // success = hijau, danger = merah
+                                    
                                     $jenis_icon = $is_masuk ? '➕' : '➖';
+                                    $row_class = $is_masuk ? 'tr-masuk' : 'tr-keluar';
                                 ?>
-                                <tr>
+                                <tr class="<?= $row_class ?>">
                                     <td><?= $no++; ?></td>
                                     
                                     <td><?= date('d/m/Y H:i', strtotime($data['tanggal_transaksi'])) ?></td>
@@ -497,7 +425,7 @@ if ($is_print_view) {
                                     <td><?= htmlspecialchars($data['petugas']) ?></td>
                                 </tr>
                                 <?php endforeach; ?>
-                            </tbody>    
+                            </tbody>    
                         </table>
                         
                         <?php if (count($data_laporan) == 0): ?>

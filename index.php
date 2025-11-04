@@ -514,7 +514,7 @@ $total_kasus_diagnosis = array_sum(array_column($diagnosis_trend['data_tren'], '
                                 <div class="card">
                                     <div class="card-header">
                                         <h4>5 Diagnosis Terbanyak (Bulan Ini)</h4>
-                                        <a href="laporan_tren_berobat.php" class="btn btn-sm btn-outline-primary float-end">Lihat Laporan Lengkap</a>
+                                        <a href="pages/laporan/laporan_tren_berobat.php" class="btn btn-sm btn-outline-primary float-end">Lihat Laporan Lengkap</a>
                                     </div>
                                     <div class="card-body">
                                         <div id="chart-diagnosis-trend"></div>
@@ -581,7 +581,7 @@ $total_kasus_diagnosis = array_sum(array_column($diagnosis_trend['data_tren'], '
                                         </li>
                                     <?php endif; ?>
                                 </ul>
-                                <a href="master_obat.php" class="btn btn-sm btn-block btn-outline-primary font-bold mt-3">Kelola Stok</a>
+                                <a href="pages/obat/master_obat.php" class="btn btn-sm btn-block btn-outline-primary font-bold mt-3">Kelola Stok</a>
                             </div>
                         </div>
 
@@ -609,7 +609,7 @@ $total_kasus_diagnosis = array_sum(array_column($diagnosis_trend['data_tren'], '
                                         </li>
                                     <?php endif; ?>
                                 </ul>
-                                <a href="riwayat_berobat.php" class="btn btn-sm btn-block btn-outline-info font-bold mt-3">Lihat Riwayat Lengkap</a>
+                                <a href="pages/berobat/riwayat_berobat.php" class="btn btn-sm btn-block btn-outline-info font-bold mt-3">Lihat Riwayat Lengkap</a>
                             </div>
                         </div>
 

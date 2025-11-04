@@ -130,7 +130,7 @@ $is_print_view = isset($_GET['print']) && $_GET['print'] == 'true';
                                     <a href="riwayat_berobat.php" class="submenu-link">Pemeriksaan Pasien</a>
                                 </li>
                                 <li class="submenu-item">
-                                    <a href="../karyawan/form_kecelakaan_kerja.php" class="submenu-link">Kecelakaan Kerja</a>
+                                    <a href="../karyawan/riwayat_kecelakaan.php" class="submenu-link">Kecelakaan Kerja</a>
                                 </li>
                             </ul>
                         </li>
@@ -156,24 +156,24 @@ $is_print_view = isset($_GET['print']) && $_GET['print'] == 'true';
                 </a>
                 <ul class="submenu ">
                     <li class="submenu-item  ">
-                        <a href="pages/laporan/laporan_berobat.php" class="submenu-link">Laporan Berobat</a>                     
+                        <a href="../laporan/laporan_berobat.php" class="submenu-link">Laporan Berobat</a>                     
                     </li>       
                     <li class="submenu-item  ">
-                        <a href="pages/laporan/laporan_obat.php" class="submenu-link">Laporan Obat</a>                     
+                        <a href="../laporan/laporan_obat.php" class="submenu-link">Laporan Obat</a>                     
                     </li>         
                     <li class="submenu-item  ">
-                        <a href="pages/laporan/form_laporan_bulanan.php" class="submenu-link">Laporan Kecelakaan Kerja</a>
+                        <a href="../laporan/form_laporan_bulanan.php" class="submenu-link">Laporan Kecelakaan Kerja</a>
                     </li>
                     <li class="submenu-item  ">
-                        <a href="pages/laporan/laporan_tren_berobat.php" class="submenu-link">Statistik Berobat</a>
+                        <a href="../laporan/laporan_tren_berobat.php" class="submenu-link">Statistik Berobat</a>
                     </li>
                     <li class="submenu-item  ">
-                        <a href="pages/laporan/laporan_tren_kecelakaan.php" class="submenu-link">Statistik Kecelakaan Kerja</a>
+                        <a href="../laporan/laporan_tren_kecelakaan.php" class="submenu-link">Statistik Kecelakaan Kerja</a>
                     </li>
                 </ul>
             </li>
                         <li class="sidebar-item">
-                            <a href="logout.php" class='sidebar-link'>
+                            <a href="../../logout.php" class='sidebar-link'>
                                 <i class="bi bi-person-circle"></i>
                                 <span>Logout</span>
                             </a>
